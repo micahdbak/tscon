@@ -1,6 +1,4 @@
-import VERTEX_SHADER from "./shaders/terminal.vert" with { type: "text" };
-import FRAGMENT_SHADER from "./shaders/terminal.frag" with { type: "text" };
-
+import { terminal_frag, terminal_vert } from "./shaders.ts";
 import { Canvas } from "./canvas.ts";
 import { Glyphs, textGlyphs } from "./glyphs.ts";
 import { Rect } from "./rect.ts";
@@ -9,7 +7,7 @@ import {
 	compileProgram,
 	getAttribLocations,
 	getUniformLocations,
-} from "./shader.ts";
+} from "./program.ts";
 
 export class Terminal {
 	private gl_program: WebGLProgram;
@@ -41,7 +39,7 @@ export class Terminal {
 		this.detail_glyphs = null;
 		this.detail_text = "";
 
-		this.gl_program = compileProgram(gl, VERTEX_SHADER, FRAGMENT_SHADER);
+		this.gl_program = compileProgram(gl, terminal_vert, terminal_frag);
 
 		this.attributes = getAttribLocations(gl, this.gl_program, {
 			colour: "a_colour",

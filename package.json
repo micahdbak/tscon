@@ -1,0 +1,10 @@
+{
+	"name": "@creat/tscon",
+	"type": "module",
+	"exports": {
+		".": {
+			"types": "./mod.ts",
+			"default": "./mod.ts"
+		}
+	}
+}

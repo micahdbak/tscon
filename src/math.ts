@@ -1,6 +1,6 @@
 export class Mat4 {
 	// create 4x4 identity matrix Mat4
-	static create() {
+	static create(): Float32Array {
 		const o = new Float32Array(16);
 		o[0] = 1;
 		o[5] = 1;
@@ -28,7 +28,7 @@ export class Mat4 {
 		m31: number,
 		m32: number,
 		m33: number,
-	) {
+	): Float32Array {
 		o[0] = m00;
 		o[1] = m01;
 		o[2] = m02;
@@ -49,7 +49,11 @@ export class Mat4 {
 	}
 
 	// multiply Mat4 a with Mat4 b and return resulting Mat4
-	static multiply(o: Float32Array, a: Float32Array, b: Float32Array) {
+	static multiply(
+		o: Float32Array,
+		a: Float32Array,
+		b: Float32Array,
+	): Float32Array {
 		const a00 = a[0],
 			a01 = a[1],
 			a02 = a[2],
@@ -102,7 +106,7 @@ export class Mat4 {
 	}
 
 	// set Mat4 o to transpose of Mat4 a
-	static transpose(o: Float32Array, a: Float32Array) {
+	static transpose(o: Float32Array, a: Float32Array): Float32Array {
 		if (o === a) {
 			// in-place transpose
 			const a01 = a[1],
@@ -145,7 +149,7 @@ export class Mat4 {
 	}
 
 	// set Mat4 o to inverse of Mat4 a
-	static inverse(o: Float32Array, a: Float32Array) {
+	static inverse(o: Float32Array, a: Float32Array): Float32Array {
 		const a00 = a[0],
 			a01 = a[1],
 			a02 = a[2],
@@ -195,7 +199,7 @@ export class Mat4 {
 		return o;
 	}
 
-	static inverseTranspose3x3(o: Float32Array, a: Float32Array) {
+	static inverseTranspose3x3(o: Float32Array, a: Float32Array): Float32Array {
 		const a00 = a[0],
 			a01 = a[1],
 			a02 = a[2],
@@ -246,7 +250,7 @@ export class Mat4 {
 		aspect: number,
 		near: number,
 		far: number,
-	) {
+	): Float32Array {
 		const f = 1.0 / Math.tan(fovy / 2.0);
 		o[0] = f / aspect;
 		o[1] = 0;
@@ -276,7 +280,7 @@ export class Mat4 {
 		top: number,
 		near: number,
 		far: number,
-	) {
+	): Float32Array {
 		o[0] = 2 / (right - left);
 		o[1] = 0;
 		o[2] = 0;
@@ -303,7 +307,7 @@ export class Mat4 {
 		e: Float32Array,
 		c: Float32Array,
 		up: Float32Array,
-	) {
+	): Float32Array {
 		let x0: number,
 			x1: number,
 			x2: number,
@@ -403,12 +407,18 @@ export class Mat4 {
 
 export class Vec4 {
 	// create and return Vec4
-	static create() {
+	static create(): Float32Array {
 		return new Float32Array(4);
 	}
 
 	// set components of Vec4 o to the given values
-	static set(o: Float32Array, x: number, y: number, z: number, w: number) {
+	static set(
+		o: Float32Array,
+		x: number,
+		y: number,
+		z: number,
+		w: number,
+	): void {
 		o[0] = x;
 		o[1] = y;
 		o[2] = z;
@@ -416,14 +426,18 @@ export class Vec4 {
 	}
 
 	// create and return Vec4 with given values
-	static from(x: number, y: number, z: number, w: number) {
+	static from(x: number, y: number, z: number, w: number): Float32Array {
 		const o = Vec4.create();
 		Vec4.set(o, x, y, z, w);
 		return o;
 	}
 
 	// transform Vec4 a by Mat4 m and return resulting Vec4
-	static transformMat4(o: Float32Array, a: Float32Array, m: Float32Array) {
+	static transformMat4(
+		o: Float32Array,
+		a: Float32Array,
+		m: Float32Array,
+	): Float32Array {
 		const x = a[0],
 			y = a[1],
 			z = a[2],

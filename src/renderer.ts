@@ -1,13 +1,11 @@
-import VERTEX_SHADER from "./shaders/renderer.vert" with { type: "text" };
-import FRAGMENT_SHADER from "./shaders/renderer.frag" with { type: "text" };
-
+import { renderer_frag, renderer_vert } from "./shaders.ts";
 import { Canvas } from "./canvas.ts";
 import { TexGlyphs } from "./glyphs.ts";
 import {
 	compileProgram,
 	getAttribLocations,
 	getUniformLocations,
-} from "./shader.ts";
+} from "./program.ts";
 import { Rect } from "./rect.ts";
 
 export class Renderer {
@@ -27,7 +25,7 @@ export class Renderer {
 		this.canvas = canvas;
 		const gl = canvas.gl;
 
-		this.gl_program = compileProgram(gl, VERTEX_SHADER, FRAGMENT_SHADER);
+		this.gl_program = compileProgram(gl, renderer_vert, renderer_frag);
 
 		this.attributes = getAttribLocations(gl, this.gl_program, {
 			row: "a_row",

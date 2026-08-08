@@ -1,6 +1,12 @@
 {
 	"name": "@creat/tscon",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"license": "MIT",
-	"exports": "./mod.ts"
+	"exports": "./mod.ts",
+	"compilerOptions": {
+		"lib": ["dom", "dom.asynciterable", "deno.ns", "esnext"]
+	},
+	"tasks": {
+		"shaders": "deno run --allow-read --allow-write scripts/shaders.ts"
+	}
 }
