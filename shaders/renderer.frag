@@ -47,7 +47,7 @@ void main() {
 	}
 
 	// 176 and 191 are the first and last box-drawing characters
-	if (u_use_user_font && (f_char_code < 176 || f_char_code > 191)) {
+	if (u_use_user_font && (f_char_code < 176 || f_char_code >= 224)) {
 		vec4 samp = texture(u_user_font, v_font_uv_coord);
 		frag_colour = vec4(mix(bg, fg, samp.r), 1.0);
 		return;
