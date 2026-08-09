@@ -1,6 +1,3 @@
-// BEGIN glyph.frag
-precision mediump float;
-
 // Computes the mix value for a coordinate relative to pixels, that will
 // snap to the center of the pixel if it is in the center 50% of it, and
 // otherwise interpolate linearly outside of the center 50%.
@@ -23,15 +20,21 @@ float bit_value(uvec4 texel, int x, int y) {
 	return float((texel[y] >> (7 - x)) & 1u);
 }
 
-float bitmap_glyph_value(mediump usampler2D bitmap, ivec2 glyph_coord, vec2 cell_coord) {
+float bitmap_glyph_value(
+	mediump usampler2D bitmap,
+	ivec2 glyph_coord,
+	vec2 cell_coord
+) {
 	int block = clamp(int(floor(cell_coord.y * 4.0)), 0, 3);
-	uvec4 texel = texelFetch(bitmap, ivec2(glyph_coord.x, glyph_coord.y + block), 0);
+	ivec2 texel_coord = ivec2(glyph_coord.x, glyph_coord.y + block);
+	uvec4 texel = texelFetch(bitmap, texel_coord, 0);
 
 	// each block is 8px wide
 	float block_x = clamp(cell_coord.x * 8.0, 0.0, 7.0);
 
 	// each cell is 4 blocks high, each block being 4px tall
-	float block_y = clamp(cell_coord.y * 16.0 - float(block) * 4.0, 0.0, 3.0);
+	float block_y = clamp(cell_coord.y * 16.0 - float(block) * 4.0,
+			      0.0, 3.0);
 
 	float horiz_weight = sharp_bilinear_weight(block_x);
 	float vert_weight = sharp_bilinear_weight(block_y);
@@ -50,5 +53,3 @@ float bitmap_glyph_value(mediump usampler2D bitmap, ivec2 glyph_coord, vec2 cell
 
 	return mix(top, bot, vert_weight);
 }
-
-// END glyph.frag

@@ -179,7 +179,8 @@ export class Mat4 {
 		const b10 = a21 * a33 - a23 * a31;
 		const b11 = a22 * a33 - a23 * a32;
 		const det = 1.0 /
-			(b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06);
+			(b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 -
+				b04 * b07 + b05 * b06);
 		o[0] = (a11 * b11 - a12 * b10 + a13 * b09) * det;
 		o[1] = (a02 * b10 - a01 * b11 - a03 * b09) * det;
 		o[2] = (a31 * b05 - a32 * b04 + a33 * b03) * det;
@@ -199,7 +200,10 @@ export class Mat4 {
 		return o;
 	}
 
-	static inverseTranspose3x3(o: Float32Array, a: Float32Array): Float32Array {
+	static inverseTranspose3x3(
+		o: Float32Array,
+		a: Float32Array,
+	): Float32Array {
 		const a00 = a[0],
 			a01 = a[1],
 			a02 = a[2],
@@ -229,7 +233,8 @@ export class Mat4 {
 		const b10 = a21 * a33 - a23 * a31;
 		const b11 = a22 * a33 - a23 * a32;
 		const det = 1.0 /
-			(b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06);
+			(b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 -
+				b04 * b07 + b05 * b06);
 		o[0] = (a11 * b11 - a12 * b10 + a13 * b09) * det;
 		o[1] = (a12 * b08 - a10 * b11 - a13 * b07) * det;
 		o[2] = (a10 * b10 - a11 * b08 + a13 * b06) * det;
@@ -361,8 +366,12 @@ export class Mat4 {
 	static translation(tx: number, ty: number, tz: number): Float32Array {
 		const m = Mat4.create();
 
-		// prettier-ignore
-		Mat4.set(m, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, tx, ty, tz, 1);
+		// deno-fmt-ignore
+		Mat4.set(m,
+			 1, 0, 0, 0,
+			 0, 1, 0, 0,
+			 0, 0, 1, 0,
+			 tx, ty, tz, 1);
 
 		return m;
 	}
@@ -370,8 +379,12 @@ export class Mat4 {
 	static scale(sx: number, sy: number, sz: number): Float32Array {
 		const m = Mat4.create();
 
-		// prettier-ignore
-		Mat4.set(m, sx, 0, 0, 0, 0, sy, 0, 0, 0, 0, sz, 0, 0, 0, 0, 1);
+		// deno-fmt-ignore
+		Mat4.set(m,
+			 sx, 0, 0, 0,
+			 0, sy, 0, 0,
+			 0, 0, sz, 0,
+			 0, 0, 0, 1);
 
 		return m;
 	}
@@ -383,20 +396,32 @@ export class Mat4 {
 
 		switch (axis) {
 			case "x":
-				// prettier-ignore
-				Mat4.set(m, 1, 0, 0, 0, 0, c, s, 0, 0, -s, c, 0, 0, 0, 0, 1);
+				// deno-fmt-ignore
+				Mat4.set(m,
+					 1, 0, 0, 0,
+					 0, c, s, 0,
+					 0, -s, c, 0,
+					 0, 0, 0, 1);
 
 				break;
 
 			case "y":
-				// prettier-ignore
-				Mat4.set(m, c, 0, -s, 0, 0, 1, 0, 0, s, 0, c, 0, 0, 0, 0, 1);
+				// deno-fmt-ignore
+				Mat4.set(m,
+					 c, 0, -s, 0,
+					 0, 1, 0, 0,
+					 s, 0, c, 0,
+					 0, 0, 0, 1);
 
 				break;
 
 			case "z":
-				// prettier-ignore
-				Mat4.set(m, c, s, 0, 0, -s, c, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1);
+				// deno-fmt-ignore
+				Mat4.set(m,
+					 c, s, 0, 0,
+					 -s, c, 0, 0,
+					 0, 0, 1, 0,
+					 0, 0, 0, 1);
 
 				break;
 		}

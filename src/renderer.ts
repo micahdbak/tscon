@@ -21,11 +21,17 @@ export class Renderer {
 
 	public canvas: Canvas;
 
+	public use_user_font: boolean;
+
 	constructor(canvas: Canvas) {
 		this.canvas = canvas;
 		const gl = canvas.gl;
 
-		this.gl_program = compileProgram(gl, renderer_vert, renderer_frag);
+		this.gl_program = compileProgram(
+			gl,
+			renderer_vert,
+			renderer_frag,
+		);
 
 		this.attributes = getAttribLocations(gl, this.gl_program, {
 			row: "a_row",
@@ -45,6 +51,8 @@ export class Renderer {
 			palette: "u_palette",
 			bitmap_font: "u_bitmap_font",
 			texture: "u_texture",
+			user_font: "u_user_font",
+			use_user_font: "u_use_user_font",
 		});
 
 		const vao = gl.createVertexArray();
@@ -70,17 +78,35 @@ export class Renderer {
 		// [ 8-bits | 8-bits | 16-bits ]
 
 		// a_row
-		gl.vertexAttribIPointer(this.attributes.row, 1, gl.UNSIGNED_BYTE, 4, 3);
+		gl.vertexAttribIPointer(
+			this.attributes.row,
+			1,
+			gl.UNSIGNED_BYTE,
+			4,
+			3,
+		);
 		gl.vertexAttribDivisor(this.attributes.row, 1);
 		gl.enableVertexAttribArray(this.attributes.row);
 
 		// a_mode
-		gl.vertexAttribIPointer(this.attributes.mode, 1, gl.UNSIGNED_BYTE, 4, 2);
+		gl.vertexAttribIPointer(
+			this.attributes.mode,
+			1,
+			gl.UNSIGNED_BYTE,
+			4,
+			2,
+		);
 		gl.vertexAttribDivisor(this.attributes.mode, 1);
 		gl.enableVertexAttribArray(this.attributes.mode);
 
 		// a_col
-		gl.vertexAttribIPointer(this.attributes.col, 1, gl.UNSIGNED_SHORT, 4, 0);
+		gl.vertexAttribIPointer(
+			this.attributes.col,
+			1,
+			gl.UNSIGNED_SHORT,
+			4,
+			0,
+		);
 		gl.vertexAttribDivisor(this.attributes.col, 1);
 		gl.enableVertexAttribArray(this.attributes.col);
 
@@ -96,8 +122,12 @@ export class Renderer {
 		gl.uniform3fv(this.uniforms.palette, this.canvas.palette);
 		gl.uniform1i(this.uniforms.bitmap_font, 0);
 		gl.uniform1i(this.uniforms.texture, 1);
+		gl.uniform1i(this.uniforms.user_font, 2);
+		gl.uniform1i(this.uniforms.use_user_font, 0);
 
 		this.resized = false;
+
+		this.use_user_font = false;
 
 		this.canvas.addEventListener("resize", () => {
 			this.resized = true;
@@ -106,7 +136,9 @@ export class Renderer {
 
 	draw(tglyphs: TexGlyphs, texture: WebGLTexture, dst: Rect) {
 		if (tglyphs.rows !== dst.rows || tglyphs.cols !== dst.cols) {
-			console.log("Renderer.draw: skipping due to bad tglyphs or dst");
+			console.log(
+				"Renderer.draw: skipping due to bad tglyphs or dst",
+			);
 			return;
 		}
 
@@ -116,8 +148,14 @@ export class Renderer {
 		if (this.resized) {
 			this.resized = false;
 
-			gl.uniform1i(this.uniforms.canvas_rows, this.canvas.rows);
-			gl.uniform1i(this.uniforms.canvas_cols, this.canvas.cols);
+			gl.uniform1i(
+				this.uniforms.canvas_rows,
+				this.canvas.rows,
+			);
+			gl.uniform1i(
+				this.uniforms.canvas_cols,
+				this.canvas.cols,
+			);
 		}
 
 		// set destination information uniforms
@@ -125,8 +163,14 @@ export class Renderer {
 		gl.uniform1i(this.uniforms.col, dst.col);
 		gl.uniform1i(this.uniforms.rows, tglyphs.rows);
 		gl.uniform1i(this.uniforms.cols, tglyphs.cols);
-		gl.uniform1i(this.uniforms.mouse_row, this.canvas.mouse_row ?? -1);
-		gl.uniform1i(this.uniforms.mouse_col, this.canvas.mouse_col ?? -1);
+		gl.uniform1i(
+			this.uniforms.mouse_row,
+			this.canvas.mouse_row ?? -1,
+		);
+		gl.uniform1i(
+			this.uniforms.mouse_col,
+			this.canvas.mouse_col ?? -1,
+		);
 
 		// set vertex buffer data to provided texture glyphs
 		gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
@@ -140,9 +184,27 @@ export class Renderer {
 		gl.activeTexture(gl.TEXTURE1);
 		gl.bindTexture(gl.TEXTURE_2D, texture);
 
+		// user application-provided font
+		if (this.use_user_font) {
+			gl.uniform1i(this.uniforms.use_user_font, 1);
+		}
+
+		if (this.canvas.user_font !== null) {
+			gl.activeTexture(gl.TEXTURE2);
+			gl.bindTexture(gl.TEXTURE_2D, this.canvas.user_font);
+		} else if (this.use_user_font) {
+			this.use_user_font = false;
+			gl.uniform1i(this.uniforms.use_user_font, 0);
+		}
+
 		// draw the glyphs covered by the provided texture glyphs
 		gl.bindVertexArray(this.vao);
-		gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, tglyphs.rows * tglyphs.cols);
+		gl.drawArraysInstanced(
+			gl.TRIANGLES,
+			0,
+			6,
+			tglyphs.rows * tglyphs.cols,
+		);
 		gl.bindVertexArray(null);
 	}
 }

@@ -48,6 +48,9 @@ export class Canvas extends EventTarget {
 
 	public bitmap_font: WebGLTexture;
 
+	// to be set by a user application
+	public user_font: WebGLTexture | null;
+
 	public class_name: string;
 
 	constructor(element: HTMLCanvasElement) {
@@ -74,9 +77,13 @@ export class Canvas extends EventTarget {
 		this.mouse_down = false;
 		this.mouse_click = false;
 
-		this.palette = new Float32Array(PALETTE.map((byte) => byte / 0xff));
+		this.palette = new Float32Array(
+			PALETTE.map((byte) => byte / 0xff),
+		);
 
 		this.bitmap_font = loadModernDosTexture(gl);
+
+		this.user_font = null;
 
 		this.class_name = "";
 
@@ -92,17 +99,21 @@ export class Canvas extends EventTarget {
 			this.mouseMove(e.clientX, e.clientY);
 		});
 
-		this.element.addEventListener("pointerdown", (e: PointerEvent) => {
-			e.preventDefault();
+		this.element.addEventListener(
+			"pointerdown",
+			(e: PointerEvent) => {
+				e.preventDefault();
 
-			this.mouseMove(e.clientX, e.clientY);
+				this.mouseMove(e.clientX, e.clientY);
 
-			this.mouse_down = true;
-			this.mouse_down_row = this.mouse_row;
-			this.mouse_down_col = this.mouse_col;
+				this.mouse_down = true;
+				this.mouse_down_row = this.mouse_row;
+				this.mouse_down_col = this.mouse_col;
 
-			(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-		});
+				(e.currentTarget as HTMLElement)
+					.setPointerCapture(e.pointerId);
+			},
+		);
 
 		this.element.addEventListener("pointerup", () => {
 			this.mouse_down = false;
@@ -126,15 +137,19 @@ export class Canvas extends EventTarget {
 			{ passive: false },
 		);
 
-		this.element.addEventListener("contextmenu", (e: MouseEvent) => {
-			e.preventDefault();
-		});
+		this.element.addEventListener(
+			"contextmenu",
+			(e: MouseEvent) => {
+				e.preventDefault();
+			},
+		);
 
 		window.addEventListener("keydown", (e: KeyboardEvent) => {
 			const target = e.target as HTMLElement | null;
 			if (
 				target &&
-				(target.tagName === "INPUT" || target.tagName === "TEXTAREA" ||
+				(target.tagName === "INPUT" ||
+					target.tagName === "TEXTAREA" ||
 					target.isContentEditable)
 			) {
 				return;
@@ -200,10 +215,16 @@ export class Canvas extends EventTarget {
 		);
 
 		const rows = Math.round(
-			Math.min(Math.max(1, this.height / target_cell_height), 256),
+			Math.min(
+				Math.max(1, this.height / target_cell_height),
+				256,
+			),
 		);
 		const cols = Math.round(
-			Math.min(Math.max(1, this.width / target_cell_width), 1024),
+			Math.min(
+				Math.max(1, this.width / target_cell_width),
+				1024,
+			),
 		);
 
 		this.actual_cell_height = this.height / rows;
@@ -234,8 +255,12 @@ export class Canvas extends EventTarget {
 		const actual_client_y = client_y * dpr;
 		const actual_client_x = client_x * dpr;
 
-		this.mouse_row = Math.floor(actual_client_y / this.actual_cell_height);
-		this.mouse_col = Math.floor(actual_client_x / this.actual_cell_width);
+		this.mouse_row = Math.floor(
+			actual_client_y / this.actual_cell_height,
+		);
+		this.mouse_col = Math.floor(
+			actual_client_x / this.actual_cell_width,
+		);
 	}
 
 	private mouseScroll(delta_mode: DeltaMode, delta: number) {
@@ -245,10 +270,17 @@ export class Canvas extends EventTarget {
 			case DeltaMode.PX:
 				this.mouse_wheel_px += delta;
 
-				if (Math.abs(this.mouse_wheel_px) >= this.actual_cell_height) {
-					rows = Math.floor(this.mouse_wheel_px / this.actual_cell_height);
+				if (
+					Math.abs(this.mouse_wheel_px) >=
+						this.actual_cell_height
+				) {
+					rows = Math.floor(
+						this.mouse_wheel_px /
+							this.actual_cell_height,
+					);
 
-					this.mouse_wheel_px %= this.actual_cell_height;
+					this.mouse_wheel_px %=
+						this.actual_cell_height;
 				}
 
 				break;
@@ -264,7 +296,9 @@ export class Canvas extends EventTarget {
 				break;
 		}
 
-		this.dispatchEvent(new CustomEvent("wheel", { detail: { rows } }));
+		this.dispatchEvent(
+			new CustomEvent("wheel", { detail: { rows } }),
+		);
 	}
 
 	private scrollDeltaForKey(key: string): number {
@@ -293,17 +327,25 @@ export class Canvas extends EventTarget {
 		this.mouseScroll(DeltaMode.ROW, this.scrollDeltaForKey(key));
 
 		// key repeats after held for a full second
-		if (this.scroll_delay === undefined && this.scroll_timer === undefined) {
+		if (
+			this.scroll_delay === undefined &&
+			this.scroll_timer === undefined
+		) {
 			this.scroll_delay = setTimeout(() => {
 				this.scroll_delay = undefined;
 				this.scroll_timer = setInterval(() => {
 					let delta = 0;
 					for (const k of this.scroll_keys_held) {
-						delta += this.scrollDeltaForKey(k);
+						delta += this.scrollDeltaForKey(
+							k,
+						);
 					}
 
 					if (delta !== 0) {
-						this.mouseScroll(DeltaMode.ROW, delta);
+						this.mouseScroll(
+							DeltaMode.ROW,
+							delta,
+						);
 					}
 				}, 50); // repeat every 50ms
 			}, 333); // wait 333ms
@@ -337,7 +379,12 @@ export class Canvas extends EventTarget {
 		);
 	}
 
-	mouseDownAt(row: number, col: number, rows: number, cols: number): boolean {
+	mouseDownAt(
+		row: number,
+		col: number,
+		rows: number,
+		cols: number,
+	): boolean {
 		return (
 			this.mouse_down_row !== undefined &&
 			this.mouse_down_col !== undefined &&
@@ -352,7 +399,12 @@ export class Canvas extends EventTarget {
 		const gl = this.gl;
 
 		// clear the canvas
-		gl.clearColor(this.palette[0], this.palette[1], this.palette[2], 1.0);
+		gl.clearColor(
+			this.palette[0],
+			this.palette[1],
+			this.palette[2],
+			1.0,
+		);
 		gl.clear(gl.COLOR_BUFFER_BIT);
 
 		this.class_name = "";

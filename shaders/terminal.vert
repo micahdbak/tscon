@@ -10,10 +10,12 @@ uniform int u_mouse_col;
 uniform vec3 u_palette[16];
 
 out vec2 v_cell_coord;
+out vec2 v_uv_coord;
 
 flat out vec3 f_fg_colour;
 flat out vec3 f_bg_colour;
 flat out ivec2 f_glyph_coord;
+flat out uint f_char_code;
 
 void main() {
 	int row = gl_InstanceID / u_cols;
@@ -38,11 +40,15 @@ void main() {
 	f_bg_colour = u_palette[bg_idx];
 
 	// 32 glyph columns, 8 glyph rows
-	int glyph_row = int(a_char_code / 32u);
-	int glyph_col = int(a_char_code % 32u);
+	int glyph_row = clamp(int(a_char_code / 32u), 0, 7);
+	int glyph_col = clamp(int(a_char_code % 32u), 0, 31);
 
 	// coordinate of a_char_code in u_bitmap_font
-	f_glyph_coord = ivec2(glyph_col, glyph_row << 2);
+	// (note: there are 4 pixels per glyph, in a column; hence row * 4)
+	f_glyph_coord = ivec2(glyph_col, glyph_row * 4);
+
+	// used when checking whether to use u_user_font or not
+	f_char_code = a_char_code;
 
 	/* A glyph is made up of two triangles, six vertices:
 	 *
@@ -51,13 +57,19 @@ void main() {
 	 *   1'     3--4    1,3--4
 	 */
 
-	int row_inc = int(gl_VertexID == 1 || gl_VertexID == 3 || gl_VertexID == 4);
-	int col_inc = int(gl_VertexID == 2 || gl_VertexID == 4 || gl_VertexID == 5);
+	int row_inc = int(gl_VertexID == 1 || gl_VertexID == 3 ||
+			  gl_VertexID == 4);
+
+	int col_inc = int(gl_VertexID == 2 || gl_VertexID == 4 ||
+			  gl_VertexID == 5);
 
 	v_cell_coord = vec2(float(col_inc), float(row_inc));
 
 	row += row_inc;
 	col += col_inc;
+
+	v_uv_coord = vec2(float(glyph_col + col_inc) / 32.0,
+			  float(glyph_row + row_inc) / 8.0);
 
 	// position needs to be in [-1.0, 1.0]
 	float ndc_x = 2.0 * float(col) / float(u_cols) - 1.0;

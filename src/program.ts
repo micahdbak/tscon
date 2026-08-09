@@ -12,7 +12,8 @@ export function compileProgram(
 	gl.compileShader(vert);
 	if (!gl.getShaderParameter(vert, gl.COMPILE_STATUS)) {
 		throw new Error(
-			"When compiling vertex shader: " + gl.getShaderInfoLog(vert),
+			"When compiling vertex shader: " +
+				gl.getShaderInfoLog(vert),
 		);
 	}
 
@@ -25,7 +26,8 @@ export function compileProgram(
 	gl.compileShader(frag);
 	if (!gl.getShaderParameter(frag, gl.COMPILE_STATUS)) {
 		throw new Error(
-			"When compiling fragment shader: " + gl.getShaderInfoLog(frag),
+			"When compiling fragment shader: " +
+				gl.getShaderInfoLog(frag),
 		);
 	}
 
@@ -39,7 +41,8 @@ export function compileProgram(
 	gl.linkProgram(prog);
 	if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
 		throw new Error(
-			"When linking shader program: " + gl.getProgramInfoLog(prog),
+			"When linking shader program: " +
+				gl.getProgramInfoLog(prog),
 		);
 	}
 
@@ -58,7 +61,9 @@ export function getAttribLocations(
 		const location = gl.getAttribLocation(program, name_in_program);
 
 		if (location < 0) {
-			throw new Error(`When getting attribute location for ${name_in_program}`);
+			throw new Error(
+				`When getting attribute location for ${name_in_program}`,
+			);
 		}
 
 		attributes[key] = location;
@@ -76,10 +81,15 @@ export function getUniformLocations(
 
 	for (const key of Object.keys(mapping)) {
 		const name_in_program = mapping[key];
-		const location = gl.getUniformLocation(program, name_in_program);
+		const location = gl.getUniformLocation(
+			program,
+			name_in_program,
+		);
 
 		if (!location) {
-			throw new Error(`When getting uniform location for ${name_in_program}`);
+			throw new Error(
+				`When getting uniform location for ${name_in_program}`,
+			);
 		}
 
 		uniforms[key] = location;

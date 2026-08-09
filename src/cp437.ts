@@ -15,7 +15,6 @@
 
 // all characters in code page 437
 // NOTE: chars at 0 and 255 are ignored
-// prettier-ignore
 export const CP437_CHARS = `\
  ☺☻♥♦♣♠•◘○◙♂♀♪♫☼►◄↕‼¶§▬↨↑↓→←∟↔▲▼\
  !"#$%&'()*+,-./0123456789:;<=>?\
@@ -74,17 +73,23 @@ export async function renderCp437(canvas: HTMLCanvasElement, font: string) {
 	canvas.width = glyph_width * cols;
 	canvas.height = glyph_height * rows;
 
+	// fill canvas with black first
+	ctx.fillStyle = "black";
+	ctx.fillRect(0, 0, canvas.width, canvas.height);
+
 	// reset these
 	ctx.font = font;
 	ctx.fillStyle = "white";
 
-	// don't want to draw box drawing characters;the moderndos font will be used for these
+	// don't want to draw box drawing characters;
+	// the moderndos font will be used for these
 	const box_drawing = "░▒▓│┤╡╢╖╕╣║╗╝╜╛┐└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀";
 	const chars = CP437_CHARS.replace(
 		box_drawing,
 		"@".repeat(box_drawing.length),
 	);
 
+	// render all glyphs
 	for (let i = 1; i < 255; i++) {
 		const x = (i % cols) * glyph_width;
 		const y = Math.floor(i / cols) * glyph_height;
@@ -98,7 +103,11 @@ export async function renderCp437(canvas: HTMLCanvasElement, font: string) {
 			glyph_height - 2 * padding,
 		);
 		ctx.clip();
-		ctx.fillText(chars.slice(i, i + 1), x + padding, y + ascent + padding);
+		ctx.fillText(
+			chars.slice(i, i + 1),
+			x + padding,
+			y + ascent + padding,
+		);
 		ctx.restore();
 	}
 }

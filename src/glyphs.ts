@@ -5,7 +5,10 @@ export const TAB_WIDTH = 8;
 
 function finalSpaceIdx(text: string, start: number): number {
 	// skip remaining white space
-	while (start < text.length && (text[start] === " " || text[start] === "\t")) {
+	while (
+		start < text.length &&
+		(text[start] === " " || text[start] === "\t")
+	) {
 		start++;
 	}
 
@@ -108,7 +111,8 @@ export function textToLines(
 
 		// tab
 		if (c === "\t") {
-			const cols_to_tab = TAB_WIDTH - (running_cols % TAB_WIDTH);
+			const cols_to_tab = TAB_WIDTH -
+				(running_cols % TAB_WIDTH);
 
 			if (running_cols + cols_to_tab > cols) {
 				lines.push(text.slice(start, i).trimEnd());
@@ -248,7 +252,10 @@ export function textGlyphs(text: string, cols: number, wrap: boolean): Glyphs {
 			let escape = c === "\\";
 
 			// \\ : display a single back slash
-			if (escape && i + 1 < line.length && line[i + 1] === "\\") {
+			if (
+				escape && i + 1 < line.length &&
+				line[i + 1] === "\\"
+			) {
 				i++; // this will be displayed as a single character
 				escape = false; // skip below checks
 			}
@@ -257,10 +264,14 @@ export function textGlyphs(text: string, cols: number, wrap: boolean): Glyphs {
 			// \aX                 : anchor in group X, no options
 			// \aX{options string} : anchor in group X, with options
 			if (
-				escape && i + 2 < line.length && line[i + 1] === "a" &&
+				escape && i + 2 < line.length &&
+				line[i + 1] === "a" &&
 				!isNaN(Number(line[i + 2]))
 			) {
-				const num = Math.max(Math.min(Number(line[i + 2]), 9), 0); // 0..9
+				const num = Math.max(
+					Math.min(Number(line[i + 2]), 9),
+					0,
+				); // 0..9
 				let skip_chars = 2;
 
 				if (glyphs.anchors[num] === undefined) {
@@ -271,12 +282,21 @@ export function textGlyphs(text: string, cols: number, wrap: boolean): Glyphs {
 				let options = null;
 
 				// options string
-				if (i + 4 <= line.length && line[i + 3] === "{") {
-					const closing_brace = line.indexOf("}", i + 3);
+				if (
+					i + 4 <= line.length &&
+					line[i + 3] === "{"
+				) {
+					const closing_brace = line.indexOf(
+						"}",
+						i + 3,
+					);
 
 					if (closing_brace > i + 3) {
 						// \aX{options} <- take text from inner braces
-						options = line.slice(i + 4, closing_brace);
+						options = line.slice(
+							i + 4,
+							closing_brace,
+						);
 
 						// skip right until the closing brace
 						skip_chars = closing_brace - i;
@@ -306,7 +326,10 @@ export function textGlyphs(text: string, cols: number, wrap: boolean): Glyphs {
 				"fFbB".includes(line[i + 1]) &&
 				!isNaN(Number(line[i + 2]))
 			) {
-				const num = Math.max(Math.min(Number(line[i + 2]), 7), 0); // 0..7
+				const num = Math.max(
+					Math.min(Number(line[i + 2]), 7),
+					0,
+				); // 0..7
 
 				switch (line[i + 1]) {
 					case "f":
@@ -351,12 +374,17 @@ export function textGlyphs(text: string, cols: number, wrap: boolean): Glyphs {
 			const char_code = charCodeInCp437(
 				line.codePointAt(i) ?? " ".codePointAt(0)!,
 			);
-			const colour_byte = ((fg & 0b1111) << 4) | (bg & 0b1111);
+			const colour_byte = ((fg & 0b1111) << 4) |
+				(bg & 0b1111);
 
-			if (char_code !== " ".codePointAt(0) || colour_byte !== 0) {
+			if (
+				char_code !== " ".codePointAt(0) ||
+				colour_byte !== 0
+			) {
 				const data_idx = row * cols + col;
 
-				const glyph = (colour_byte << 8) | (char_code & 0xff);
+				const glyph = (colour_byte << 8) |
+					(char_code & 0xff);
 
 				glyphs.data[data_idx] = glyph;
 			}
@@ -401,14 +429,21 @@ export function textureGlyphs(
 		const col = data_idx % cols;
 
 		if (global_mode == TexGlyphMode.MIX) {
-			mode = (row + col) % 2 == 0 ? TexGlyphMode.SAMPLE : TexGlyphMode.GLYPHS;
+			mode = (row + col) % 2 == 0
+				? TexGlyphMode.SAMPLE
+				: TexGlyphMode.GLYPHS;
 		} else if (global_mode == TexGlyphMode.ROWS) {
-			mode = row % 2 == 0 ? TexGlyphMode.SAMPLE : TexGlyphMode.GLYPHS;
+			mode = row % 2 == 0
+				? TexGlyphMode.SAMPLE
+				: TexGlyphMode.GLYPHS;
 		} else if (global_mode == TexGlyphMode.COLS) {
-			mode = col % 2 == 0 ? TexGlyphMode.SAMPLE : TexGlyphMode.GLYPHS;
+			mode = col % 2 == 0
+				? TexGlyphMode.SAMPLE
+				: TexGlyphMode.GLYPHS;
 		}
 
-		const glyph = ((row & 0xff) << 24) | ((mode & 0xff) << 16) | (col & 0xffff);
+		const glyph = ((row & 0xff) << 24) | ((mode & 0xff) << 16) |
+			(col & 0xffff);
 
 		tglyphs.data[data_idx] = glyph;
 	}

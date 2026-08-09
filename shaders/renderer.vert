@@ -21,14 +21,16 @@ uniform int u_mouse_col;
 uniform vec3 u_palette[16];
 uniform sampler2D u_texture;
 
-out vec2 v_cell_coord; // f_mode > 0
-out vec2 v_uv_coord;
+out vec2 v_cell_coord;
+out vec2 v_tex_uv_coord; // sample mode
+out vec2 v_font_uv_coord;
 
 flat out uint f_mode;
 flat out int f_is_cursor;
-flat out vec3 f_fg_colour; // f_mode > 0
-flat out vec3 f_bg_colour; // f_mode > 0
-flat out ivec2 f_glyph_coord; // f_mode > 0
+flat out vec3 f_fg_colour;
+flat out vec3 f_bg_colour;
+flat out ivec2 f_glyph_coord;
+flat out int f_char_code;
 
 const vec3 dimensions[8] = vec3[](
 	vec3(0.0, 0.0, 0.0),	// black (unused)
@@ -117,7 +119,8 @@ Glyph getBgGlyph(int dim, float lum) {
 	if (dim == 7) {
 		if (layer > 0) {
 			// reverse the order of the glyphs
-			glyphs = int[](64, 36, 35, 42, 33, 61, 59, 58, 44, 45, 46, 0);
+			glyphs = int[](64, 36, 35, 42, 33, 61, 59, 58, 44, 45,
+				       46, 0);
 		}
 
 		fgs = int[](7, 0, 8);
@@ -138,7 +141,8 @@ void main() {
 	int origin_row = int(a_row);
 	int origin_col = int(a_col);
 
-	f_is_cursor = int(origin_row + u_row == u_mouse_row && origin_col + u_col == u_mouse_col);
+	f_is_cursor = int(origin_row + u_row == u_mouse_row &&
+			  origin_col + u_col == u_mouse_col);
 
 	/* A glyph is made up of two triangles, six vertices:
 	 *
@@ -147,15 +151,19 @@ void main() {
 	 *   1'     3--4    1,3--4
 	 */
 
-	int row_inc = int(gl_VertexID == 1 || gl_VertexID == 3 || gl_VertexID == 4);
-	int col_inc = int(gl_VertexID == 2 || gl_VertexID == 4 || gl_VertexID == 5);
+	int row_inc = int(gl_VertexID == 1 || gl_VertexID == 3 ||
+			  gl_VertexID == 4);
+
+	int col_inc = int(gl_VertexID == 2 || gl_VertexID == 4 ||
+			  gl_VertexID == 5);
 
 	v_cell_coord = vec2(float(col_inc), float(row_inc));
 
 	int row = origin_row + row_inc;
 	int col = origin_col + col_inc;
 
-	v_uv_coord = vec2(float(col) / float(u_cols), float(row) / float(u_rows));
+	v_tex_uv_coord = vec2(float(col) / float(u_cols),
+			  float(row) / float(u_rows));
 
 	// position needs to be in [-1.0, 1.0]
 	float ndc_x = 2.0 * float(u_col + col) / float(u_canvas_cols) - 1.0;
@@ -173,18 +181,10 @@ void main() {
 
 	// dithered glyphs mode
 
-	vec2 origin_uv_coord = vec2(float(origin_col) / float(u_cols), float(origin_row) / float(u_rows));
+	vec2 origin_uv_coord = vec2(float(origin_col) / float(u_cols),
+				    float(origin_row) / float(u_rows));
 
 	vec2 full_uv_cell = vec2(1.0 / float(u_cols), 1.0 / float(u_rows));
-	/*
-	// sample across cell's texel using mipmaps when available
-	vec2 br = origin_uv_coord + full_uv_cell; // bottom-right uv coord of cell
-	vec4 samp = textureGrad(u_texture,
-		origin_uv_coord + 0.5 * full_uv_cell,
-		vec2(br.x - origin_uv_coord.x, 0.0),
-		vec2(0.0, br.y - origin_uv_coord.y));
-	vec3 colour = samp.rgb;
-	*/
 	vec4 samp = texture(u_texture, origin_uv_coord + 0.5 * full_uv_cell);
 	vec3 colour = samp.rgb;
 
@@ -221,9 +221,14 @@ void main() {
 	f_bg_colour = u_palette[glyph.bg_idx];
 
 	// 32 glyph columns, 8 glyph rows
-	int glyph_row = int(glyph.char_code / 32);
-	int glyph_col = int(glyph.char_code % 32);
+	int glyph_row = clamp(int(glyph.char_code / 32), 0, 7);
+	int glyph_col = clamp(int(glyph.char_code % 32), 0, 31);
 
 	// coordinate of char_code in u_bitmap_font
 	f_glyph_coord = ivec2(glyph_col, glyph_row << 2);
+
+	f_char_code = glyph.char_code;
+
+	v_font_uv_coord = vec2(float(glyph_col + col_inc) / 32.0,
+			       float(glyph_row + row_inc) / 8.0);
 }

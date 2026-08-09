@@ -34,7 +34,11 @@ export function loadTexture(
 				gl.LINEAR_MIPMAP_LINEAR,
 			);
 
-			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+			gl.texParameteri(
+				gl.TEXTURE_2D,
+				gl.TEXTURE_MAG_FILTER,
+				gl.LINEAR,
+			);
 
 			resolve(tex);
 		};
@@ -66,17 +70,31 @@ export async function loadCubeMap(
 	];
 
 	const promises = faces.map(async (path, index) => {
-		const image = new Promise<HTMLImageElement>((resolve, reject) => {
-			const img = new Image();
-			img.src = path;
-			img.onload = () => resolve(img);
-			img.onerror = (err: Event | string) =>
-				reject(new Error(`When loading image at ${path}`, { cause: err }));
-		});
+		const image = new Promise<HTMLImageElement>(
+			(resolve, reject) => {
+				const img = new Image();
+				img.src = path;
+				img.onload = () => resolve(img);
+				img.onerror = (err: Event | string) =>
+					reject(
+						new Error(
+							`When loading image at ${path}`,
+							{ cause: err },
+						),
+					);
+			},
+		);
 
 		const img = await image;
 		gl.bindTexture(gl.TEXTURE_CUBE_MAP, texture);
-		gl.texImage2D(targets[index], 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+		gl.texImage2D(
+			targets[index],
+			0,
+			gl.RGBA,
+			gl.RGBA,
+			gl.UNSIGNED_BYTE,
+			img,
+		);
 	});
 
 	await Promise.all(promises);

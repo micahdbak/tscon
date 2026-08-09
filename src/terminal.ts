@@ -30,6 +30,8 @@ export class Terminal {
 
 	public detail_text: string;
 
+	public use_user_font: boolean;
+
 	constructor(canvas: Canvas) {
 		this.canvas = canvas;
 		const gl = canvas.gl;
@@ -39,7 +41,11 @@ export class Terminal {
 		this.detail_glyphs = null;
 		this.detail_text = "";
 
-		this.gl_program = compileProgram(gl, terminal_vert, terminal_frag);
+		this.gl_program = compileProgram(
+			gl,
+			terminal_vert,
+			terminal_frag,
+		);
 
 		this.attributes = getAttribLocations(gl, this.gl_program, {
 			colour: "a_colour",
@@ -53,6 +59,8 @@ export class Terminal {
 			mouse_col: "u_mouse_col",
 			palette: "u_palette",
 			bitmap_font: "u_bitmap_font",
+			user_font: "u_user_font",
+			use_user_font: "u_use_user_font",
 		});
 
 		const vao = gl.createVertexArray();
@@ -78,7 +86,13 @@ export class Terminal {
 		// [ 8 bits   | 8 bits      ]
 
 		// a_colour
-		gl.vertexAttribIPointer(this.attributes.colour, 1, gl.UNSIGNED_BYTE, 2, 1);
+		gl.vertexAttribIPointer(
+			this.attributes.colour,
+			1,
+			gl.UNSIGNED_BYTE,
+			2,
+			1,
+		);
 		gl.vertexAttribDivisor(this.attributes.colour, 1);
 		gl.enableVertexAttribArray(this.attributes.colour);
 
@@ -102,8 +116,12 @@ export class Terminal {
 		gl.uniform1i(this.uniforms.mouse_col, -1);
 		gl.uniform3fv(this.uniforms.palette, this.canvas.palette);
 		gl.uniform1i(this.uniforms.bitmap_font, 0);
+		gl.uniform1i(this.uniforms.user_font, 1);
+		gl.uniform1i(this.uniforms.use_user_font, 0);
 
 		this.resized = true;
+
+		this.use_user_font = false;
 
 		this.canvas.addEventListener("resize", () => {
 			this.resized = true;
@@ -113,7 +131,9 @@ export class Terminal {
 	blit(glyphs: Glyphs, src: Rect, dst: Rect) {
 		// validate the input rects
 		if (src.rows !== dst.rows || src.cols !== dst.cols) {
-			console.log("Terminal.blit: not blitting due to bad src or dst");
+			console.log(
+				"Terminal.blit: not blitting due to bad src or dst",
+			);
 			return;
 		}
 
@@ -162,13 +182,15 @@ export class Terminal {
 		// handle overflow
 
 		if (dst.row + dst.rows > this.canvas.rows) {
-			const extra_rows = dst.row + dst.rows - this.canvas.rows;
+			const extra_rows = dst.row + dst.rows -
+				this.canvas.rows;
 			dst.rows -= extra_rows;
 			src.rows = dst.rows;
 		}
 
 		if (dst.col + dst.cols > this.canvas.cols) {
-			const extra_cols = dst.col + dst.cols - this.canvas.cols;
+			const extra_cols = dst.col + dst.cols -
+				this.canvas.cols;
 			dst.cols -= extra_cols;
 			src.cols = dst.cols;
 		}
@@ -177,7 +199,10 @@ export class Terminal {
 			const src_row = row + src.row;
 			const dst_row = row + dst.row;
 
-			if (src_row >= src.row + src.rows || dst_row >= dst.row + dst.rows) {
+			if (
+				src_row >= src.row + src.rows ||
+				dst_row >= dst.row + dst.rows
+			) {
 				break;
 			}
 
@@ -185,7 +210,10 @@ export class Terminal {
 			const dst_idx = dst_row * this.canvas.cols + dst.col;
 
 			this.fbcon.set(
-				glyphs.data.subarray(src_idx, src_idx + src.cols),
+				glyphs.data.subarray(
+					src_idx,
+					src_idx + src.cols,
+				),
 				dst_idx,
 			);
 		}
@@ -201,7 +229,9 @@ export class Terminal {
 			gl.uniform1i(this.uniforms.rows, this.canvas.rows);
 			gl.uniform1i(this.uniforms.cols, this.canvas.cols);
 
-			this.fbcon = new Uint16Array(this.canvas.rows * this.canvas.cols);
+			this.fbcon = new Uint16Array(
+				this.canvas.rows * this.canvas.cols,
+			);
 		}
 
 		this.fbcon.fill(0);
@@ -224,10 +254,18 @@ export class Terminal {
 			}
 		}
 
-		if (this.detail_text.length > 0 && this.detail_glyphs !== null) {
+		if (
+			this.detail_text.length > 0 &&
+			this.detail_glyphs !== null
+		) {
 			this.blit(
 				this.detail_glyphs,
-				{ row: 0, col: 0, rows: 1, cols: this.detail_glyphs.cols },
+				{
+					row: 0,
+					col: 0,
+					rows: 1,
+					cols: this.detail_glyphs.cols,
+				},
 				{
 					row: this.canvas.rows - 1,
 					col: 0,
@@ -241,8 +279,14 @@ export class Terminal {
 		gl.useProgram(this.gl_program);
 
 		// set mouse position uniforms
-		gl.uniform1i(this.uniforms.mouse_row, this.canvas.mouse_row ?? -1);
-		gl.uniform1i(this.uniforms.mouse_col, this.canvas.mouse_col ?? -1);
+		gl.uniform1i(
+			this.uniforms.mouse_row,
+			this.canvas.mouse_row ?? -1,
+		);
+		gl.uniform1i(
+			this.uniforms.mouse_col,
+			this.canvas.mouse_col ?? -1,
+		);
 
 		// upload glyph data to the GPU
 		gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
@@ -251,6 +295,19 @@ export class Terminal {
 		// bind and activate the bitmap font
 		gl.activeTexture(gl.TEXTURE0);
 		gl.bindTexture(gl.TEXTURE_2D, this.canvas.bitmap_font);
+
+		// user application-provided font
+		if (this.use_user_font) {
+			gl.uniform1i(this.uniforms.use_user_font, 1);
+		}
+
+		if (this.canvas.user_font !== null) {
+			gl.activeTexture(gl.TEXTURE1);
+			gl.bindTexture(gl.TEXTURE_2D, this.canvas.user_font);
+		} else if (this.use_user_font) {
+			this.use_user_font = false;
+			gl.uniform1i(this.uniforms.use_user_font, 0);
+		}
 
 		// draw glyphs: generate 6 vertices (two triangles = one quad) per glyph instance
 		gl.bindVertexArray(this.vao);
