@@ -9,6 +9,17 @@ import {
 	getUniformLocations,
 } from "./program.ts";
 
+/**
+ * Renders a character grid from glyphs onto a {@link Canvas}.
+ *
+ * `Terminal` owns a `rows` x `cols` framebuffer of packed 16-bit glyph
+ * cells (as produced by {@link textGlyphs}) and draws it one instanced
+ * quad per cell. A frame is typically: {@link clear}, {@link blit} one or
+ * more {@link Glyphs} blocks onto the framebuffer, then {@link draw}.
+ *
+ * If {@link detail_text} is set, it is rendered onto the last row as a
+ * status line each frame.
+ */
 export class Terminal {
 	private gl_program: WebGLProgram;
 
@@ -26,12 +37,32 @@ export class Terminal {
 	private last_detail_text: string;
 	private detail_glyphs: Glyphs | null;
 
+	/** The {@link Canvas} this terminal renders into. */
 	public canvas: Canvas;
 
+	/**
+	 * Status text shown on the bottom row, or `""` for none.
+	 *
+	 * When non-empty it is compiled to glyphs (with a bright-on-black
+	 * style) and blitted across the last row each {@link draw}. Components
+	 * use this to show hover details, link URLs, etc.
+	 */
 	public detail_text: string;
 
+	/**
+	 * Whether to use {@link Canvas.user_font} for non-box glyphs when
+	 * available. Set to `true` by the application after assigning a font
+	 * texture to `canvas.user_font`; automatically falls back to the bitmap
+	 * font if `user_font` is `null`.
+	 */
 	public use_user_font: boolean;
 
+	/**
+	 * Initializes the terminal for use.
+	 * Listens for `"resize"` events from the canvas.
+	 *
+	 * @param canvas  The canvas to render into.
+	 */
 	constructor(canvas: Canvas) {
 		this.canvas = canvas;
 		const gl = canvas.gl;
@@ -128,6 +159,30 @@ export class Terminal {
 		});
 	}
 
+	/**
+	 * Copy a region of a {@link Glyphs} block onto the console framebuffer.
+	 *
+	 * `src` selects the region of `glyphs` to copy and `dst` selects where
+	 * on the console it goes. `src` and `dst` must be the same size;
+	 * otherwise the blit is skipped. Both rectangles are clipped to their
+	 * respective bounds, with negative origins handled by shifting both
+	 * `src` and `dst` together, so partial off-screen copies work as
+	 * expected.
+	 *
+	 * This only writes to the in-memory framebuffer; call {@link draw} to
+	 * rasterise it.
+	 *
+	 * @example
+	 * ```ts
+	 * terminal.blit(content,
+	 *   { row: 0, col: 0, rows: content.rows, cols: content.cols },
+	 *   { row: 2, col: 4, rows: content.rows, cols: content.cols });
+	 * ```
+	 *
+	 * @param glyphs  Source glyph grid.
+	 * @param src     Region of `glyphs` to copy.
+	 * @param dst     Destination region on the console.
+	 */
 	blit(glyphs: Glyphs, src: Rect, dst: Rect) {
 		// validate the input rects
 		if (src.rows !== dst.rows || src.cols !== dst.cols) {
@@ -219,6 +274,13 @@ export class Terminal {
 		}
 	}
 
+	/**
+	 * Clears the framebuffer. If the canvas has been resized since the
+	 * last clear, the framebuffer is reallocated to the new `rows` x
+	 * `cols` size. Resets {@link detail_text} to `""`.
+	 *
+	 * Call at the start of each frame, before blitting content.
+	 */
 	clear() {
 		const gl = this.canvas.gl;
 
@@ -239,6 +301,15 @@ export class Terminal {
 		this.detail_text = "";
 	}
 
+	/**
+	 * Rasterise the console framebuffer to the canvas.
+	 *
+	 * If {@link detail_text} changed since the last draw it is recompiled
+	 * to glyphs and blitted across the bottom row. Then the framebuffer
+	 * is uploaded and drawn.
+	 *
+	 * Call this once per frame after all {@link blit} calls are done.
+	 */
 	draw() {
 		if (this.last_detail_text !== this.detail_text) {
 			this.last_detail_text = this.detail_text;

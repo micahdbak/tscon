@@ -1,3 +1,29 @@
+/**
+ * Load an image file from `path` into a mipmapped, linearly-filtered WebGL2
+ * texture.
+ *
+ * The image is decoded via an `Image` element, uploaded to the GL context as
+ * an `RGBA`/`UNSIGNED_BYTE` texture with premultiplied alpha, and given
+ * `LINEAR_MIPMAP_LINEAR` minification and `LINEAR` magnification filtering so
+ * it can be sampled at arbitrary sizes by a shader.
+ *
+ * The returned texture is suitable for use as the `texture` argument of
+ * {@link Renderer.draw} (e.g. a photograph, portrait or rendered scene) or
+ * as the `canvas.user_font` application-provided font texture.
+ *
+ * @example
+ * ```ts
+ * import { Canvas, loadTexture } from "@creat/tscon";
+ *
+ * const canvas = new Canvas(element);
+ * const texture = await loadTexture(canvas.gl, "/images/portrait.jpeg");
+ * ```
+ *
+ * @param gl    The WebGL2 context to create the texture on.
+ * @param path  URL/path of the image to load.
+ * @returns     A promise that resolves with the created `WebGLTexture` once
+ *              the image has been decoded and uploaded.
+ */
 export function loadTexture(
 	gl: WebGL2RenderingContext,
 	path: string,
@@ -45,6 +71,44 @@ export function loadTexture(
 	});
 }
 
+/**
+ * Load six images into a mipmapped cube-map texture.
+ *
+ * Cube maps are used for environment/skybox rendering. The six faces must be
+ * supplied in the standard OpenGL cube-map face order:
+ *
+ * 1. positive X (right)
+ * 2. negative X (left)
+ * 3. positive Y (top)
+ * 4. negative Y (bottom)
+ * 5. positive Z (front)
+ * 6. negative Z (back)
+ *
+ * The resulting texture uses `LINEAR_MIPMAP_LINEAR` / `LINEAR` filtering and is
+ * suitable for sampling with `samplerCube` in a shader.
+ *
+ * @example
+ * ```ts
+ * import { Canvas, loadCubeMap } from "@creat/tscon";
+ *
+ * const canvas = new Canvas(element);
+ * const skybox = await loadCubeMap(canvas.gl, [
+ *   "/images/skybox/right.png",
+ *   "/images/skybox/left.png",
+ *   "/images/skybox/top.png",
+ *   "/images/skybox/bottom.png",
+ *   "/images/skybox/front.png",
+ *   "/images/skybox/back.png",
+ * ]);
+ * ```
+ *
+ * @param gl     The WebGL2 context to create the texture on.
+ * @param faces  Exactly six image URLs, one per cube-map face
+ *              (see order above).
+ * @returns      A promise that resolves with the created cube-map texture.
+ * @throws       If `faces` does not contain exactly six entries or the GL
+ *              texture cannot be created.
+ */
 export async function loadCubeMap(
 	gl: WebGL2RenderingContext,
 	faces: string[],

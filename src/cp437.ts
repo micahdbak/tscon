@@ -13,8 +13,16 @@
 ╚════════════════════════════════════╝
 */
 
-// all characters in code page 437
-// NOTE: chars at 0 and 255 are ignored
+/**
+ * The 256 characters of IBM Code Page 437, as a string indexed by code.
+ *
+ * Index 0 is a blank (the CP437 NUL is unused) and index 255 is also treated
+ * as blank; all other indices 1..254 map to the corresponding CP437 glyph.
+ * This is the character set tscon's bitmap font covers and that
+ * {@link textGlyphs} encodes glyphs in.
+ *
+ * NOTE: chars at 0 and 255 are ignored.
+ */
 export const CP437_CHARS = `\
  ☺☻♥♦♣♠•◘○◙♂♀♪♫☼►◄↕‼¶§▬↨↑↓→←∟↔▲▼\
  !"#$%&'()*+,-./0123456789:;<=>?\
@@ -46,6 +54,17 @@ for (let i = 1; i < 255; i++) {
 	CP437_MAP[code_point] = i;
 }
 
+/**
+ * Map a Unicode code point to its CP437 index, or `0` if not representable.
+ *
+ * Characters in {@link CP437_CHARS} are mapped to their index (1..254); any
+ * code point above the maximum one present in CP437 (or otherwise absent)
+ * returns `0` (blank). This is used internally by {@link textGlyphs} when
+ * encoding characters into glyphs.
+ *
+ * @param code_point  The Unicode code point to look up.
+ * @returns           The CP437 index (1..254), or `0` if not representable.
+ */
 export function charCodeInCp437(code_point: number): number {
 	if (code_point > CP437_MAX_CODE_POINT) {
 		return 0;
@@ -54,6 +73,30 @@ export function charCodeInCp437(code_point: number): number {
 	return CP437_MAP[code_point];
 }
 
+/**
+ * Render the CP437 character set onto a 2D canvas for use as a font texture.
+ *
+ * Loads the given `font` CSS string via the Font Loading API, measures an
+ * `"A"` glyph to determine per-cell dimensions, then paints all 255 CP437
+ * glyphs into a 32-column x 8-row grid on the supplied `canvas` (white on
+ * black). Box-drawing characters are replaced with `"@"` placeholders so
+ * they are not double-drawn; tscon's built-in bitmap font is used for those.
+ *
+ * The resulting canvas is intended to be captured (e.g. via `toDataURL` or a
+ * WebGL texture upload) to produce an application-provided font texture that
+ * can be assigned to {@link Canvas.user_font}.
+ *
+ * @example
+ * ```ts
+ * import { renderCp437 } from "@creat/tscon";
+ *
+ * const canvas = document.getElementById("2d") as HTMLCanvasElement;
+ * await renderCp437(canvas, "160px 'JetBrains Mono'");
+ * ```
+ *
+ * @param canvas  The 2D canvas to render onto. Its `width`/`height` are set.
+ * @param font    A CSS font string used to render the glyphs.
+ */
 export async function renderCp437(canvas: HTMLCanvasElement, font: string) {
 	await document.fonts.load(font);
 

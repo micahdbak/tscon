@@ -1,6 +1,12 @@
 import { Colour } from "./colour.ts";
 import { charCodeInCp437 } from "./cp437.ts";
 
+/**
+ * Number of columns a tab advances the cursor by.
+ *
+ * Tabs in text processed by {@link textToLines} and {@link textGlyphs}
+ * advance the column position to the next multiple of this width.
+ */
 export const TAB_WIDTH = 8;
 
 function finalSpaceIdx(text: string, start: number): number {
@@ -26,6 +32,47 @@ function finalSpaceIdx(text: string, start: number): number {
 	return start - 1;
 }
 
+/**
+ * Layout `text` into lines no wider than `cols` columns.
+ *
+ * This is the line-breaking pass used by {@link textGlyphs}. It interprets
+ * the tscon text escape sequences so they are not counted against the
+ * column budget, and returns the raw visible content of each line as a
+ * string (still containing the escape codes for later processing).
+ *
+ * The following escape sequences are recognised and treated as taking up
+ * zero columns:
+ *
+ * - `\\` -- a literal backslash (collapses to one displayed char)
+ * - `\aX` and `\aX{options}` -- an anchor in group `X` (0-9), with an
+ *   optional `{...}` options string
+ * - `\fX` / `\FX` -- set foreground to colour `X` (dark / bright)
+ * - `\bX` / `\BX` -- set background to colour `X` (dark / bright)
+ *
+ * Newlines always break the line. A backslash immediately followed by a
+ * newline is a line continuation: the two characters are removed and the
+ * following content joins the current line. Tabs advance to the next
+ * multiple of {@link TAB_WIDTH}.
+ *
+ * When `wrap` is `true`, lines longer than `cols` are wrapped at the most
+ * recent space (or broken mid-word if a single word fills a whole line).
+ * When `wrap` is `false`, lines longer than `cols` are truncated at the
+ * end of the line and the rest of that logical line is discarded.
+ *
+ * @example
+ * ```ts
+ * import { textToLines } from "@creat/tscon";
+ *
+ * textToLines("hello world", 80, true);   // ["hello world"]
+ * ```
+ *
+ * @param text  The text to lay out, possibly with escape sequences.
+ * @param cols  Maximum number of visible columns per line. If `<= 0`, an
+ *              empty array is returned.
+ * @param wrap  Whether to word-wrap long lines (`true`) or truncate them
+ *              (`false`).
+ * @returns     The laid-out visible lines, with escape sequences preserved.
+ */
 export function textToLines(
 	text: string,
 	cols: number,
@@ -198,19 +245,102 @@ export function textToLines(
 	return lines;
 }
 
+/**
+ * A named position inside a {@link Glyphs} block, produced by an `\aX`
+ * anchor escape sequence in the source text.
+ *
+ * Anchors are grouped by the single digit `X` (0-9) following the `\a`
+ * escape, and the position recorded is the row/column of the glyph the
+ * anchor precedes. The optional `{...}` payload becomes {@link options}.
+ *
+ * They are how the text format marks interactive or navigable points
+ * (links, section headings, image placements, etc.) that the application
+ * can later find and render -- for example link text + URL or a section hash.
+ */
 export type Anchor = {
+	/**
+	 * The text inside the anchor's optional `{...}` payload, or `null` if
+	 * the anchor had no payload (or an empty payload, which is treated as
+	 * `null`). Conventions like `"text|url"` are defined by the caller.
+	 */
 	options: string | null;
+	/** Row (y) of the anchor within the glyph grid. */
 	row: number;
+	/** Column (x) of the anchor within the glyph grid. */
 	col: number;
 };
 
+/**
+ * A grid of pre-rendered terminal glyphs produced by {@link textGlyphs}.
+ *
+ * Each cell is a single 16-bit value packing a CP437 character code in the
+ * low byte and a 4-bit foreground / 4-bit background colour pair in the
+ * high byte: `[ fg (4) | bg (4) | char_code (8) ]`. Colours are indices into
+ * {@link PALETTE} (see {@link Colour}). Cells that are blank (a space on
+ * the default black-on-black colour) are left as zero.
+ *
+ * `data` is laid out row-major with `rows * cols` entries, so the glyph at
+ * `(row, col)` is at index `row * cols + col`.
+ *
+ * {@link anchors} records the positions of every `\aX` anchor found while
+ * rendering, keyed by group number 0-9.
+ *
+ * Pass a `Glyphs` to {@link Terminal.blit} to copy it onto the console's
+ * framebuffer.
+ */
 export type Glyphs = {
+	/** Packed glyph data, length `rows * cols`, row-major. */
 	data: Uint16Array;
+	/** Number of rows in the grid. */
 	rows: number;
+	/** Number of columns in the grid. */
 	cols: number;
+	/**
+	 * Anchors keyed by group number (0-9). Each value is the list of
+	 * anchors in that group, in the order they appear in the text.
+	 */
 	anchors: Record<number, Anchor[]>;
 };
 
+/**
+ * Render `text` into a grid of terminal glyphs `cols` wide.
+ *
+ * This is the primary text-rendering entry point. It runs {@link textToLines}
+ * to lay the text out, then encodes each visible character as a packed
+ * 16-bit glyph (CP437 code + colour pair) into the resulting {@link Glyphs}.
+ *
+ * The escape sequences understood by the text format are interpreted here:
+ *
+ * - `\\` -- emits a single literal backslash
+ * - `\aX` / `\aX{options}` -- records an anchor in group `X` (0-9) at the
+ *   current position, with optional `options` string (see {@link Anchor})
+ * - `\fX` / `\FX` -- set foreground colour to `X` (dark / bright)
+ * - `\bX` / `\BX` -- set background colour to `X` (dark / bright)
+ *
+ * Colours `X` are clamped to 0-7; the `F`/`B` (capital) variants add 8 to
+ * select the bright half of the palette. The initial foreground is
+ * {@link Colour.WHITE} and the initial background is {@link Colour.BLACK}.
+ *
+ * Tabs advance the column to the next multiple of {@link TAB_WIDTH} but
+ * do not emit anything. Characters outside the CP437 range map to 0
+ * (blank), and trailing space on the default colour is left as zero so it
+ * does not overwrite whatever is already on the console.
+ *
+ * @example
+ * ```ts
+ * import { textGlyphs } from "@creat/tscon";
+ *
+ * // bright-blue on black "Link", 4 cols wide
+ * const g = textGlyphs("\\F4\\b0Link", 4, false);
+ * ```
+ *
+ * @param text  The text to render, with escape sequences.
+ * @param cols  Width of the grid in cells. If `<= 0`, an empty grid is
+ *              returned.
+ * @param wrap  Whether to word-wrap long lines (`true`) or truncate them
+ *              (`false`).
+ * @returns     The rendered glyph grid, with anchors populated.
+ */
 export function textGlyphs(text: string, cols: number, wrap: boolean): Glyphs {
 	if (cols <= 0) {
 		return {
@@ -396,6 +526,31 @@ export function textGlyphs(text: string, cols: number, wrap: boolean): Glyphs {
 	return glyphs;
 }
 
+/**
+ * How each cell of a {@link TexGlyphs} grid samples its source texture.
+ *
+ * The value is packed into each texture-glyph and read by the renderer's
+ * vertex shader to decide, per cell, how to turn the source texture into a
+ * drawn glyph.
+ *
+ * - `SAMPLE`    -- render the source texture directly. Each cell is given UV
+ *                  coordinates into the texture, so the full rendered region
+ *                  simply shows the source texture as-is.
+ * - `GLYPHS`    -- sample the texture and convert it to a glyph: the
+ *                  character is chosen by the sample's brightness and the
+ *                  colour by dithering (Bayer matrix + nearest palette hue).
+ *                  The background stays black. Preferred when you want the
+ *                  texture rendered as coloured characters without it being
+ *                  too bright or jarring.
+ * - `BG_GLYPHS` -- like `GLYPHS`, but also sets the background colour, so
+ *                  the full glyph (foreground + background) carries more of
+ *                  the sample's colour. This is noticeably brighter and more
+ *                  visually accurate; use it when no text is drawn on top of
+ *                  the rendered texture.
+ * - `MIX`       -- alternate `SAMPLE`/`GLYPHS` in a checkerboard pattern.
+ * - `ROWS`      -- alternate `SAMPLE`/`GLYPHS` by row.
+ * - `COLS`      -- alternate `SAMPLE`/`GLYPHS` by column.
+ */
 export enum TexGlyphMode {
 	SAMPLE = 0,
 	GLYPHS = 1,
@@ -405,12 +560,51 @@ export enum TexGlyphMode {
 	COLS = 5,
 }
 
+/**
+ * A grid of texture-sampling descriptors produced by {@link textureGlyphs}
+ * and consumed by {@link Renderer.draw}.
+ *
+ * Each cell is a 32-bit value packing the cell's row, its {@link TexGlyphMode},
+ * and its column: `[ row (8) | mode (8) | col (16) ]`.
+ *
+ * `data` is laid out row-major with `rows * cols` entries.
+ */
 export type TexGlyphs = {
+	/** Packed texture-glyph data, length `rows * cols`, row-major. */
 	data: Uint32Array;
+	/** Number of rows in the grid. */
 	rows: number;
+	/** Number of columns in the grid. */
 	cols: number;
 };
 
+/**
+ * Build a {@link TexGlyphs} grid of `rows` by `cols` cells that samples a
+ * texture in the given {@link TexGlyphMode}.
+ *
+ * The grid is sized to match a region of the terminal (typically the whole
+ * canvas, `canvas.rows` x `canvas.cols`, or a smaller sub-region) and is
+ * passed to {@link Renderer.draw} along with the texture to display.
+ *
+ * For the `MIX`, `ROWS`, and `COLS` modes the requested `mode` is used as a
+ * base and individual cells are switched between `SAMPLE` and `GLYPHS`
+ * according to the pattern (see {@link TexGlyphMode} for what each mode does
+ * to the sampled texture). The packed per-cell value encodes the cell's own
+ * row/column and the (possibly per-cell) effective mode.
+ *
+ * @example
+ * ```ts
+ * import { TexGlyphMode, textureGlyphs } from "@creat/tscon";
+ *
+ * // whole-canvas glyphs that sample the texture as coloured characters
+ * const tg = textureGlyphs(canvas.rows, canvas.cols, TexGlyphMode.GLYPHS);
+ * ```
+ *
+ * @param rows  Height of the grid in cells.
+ * @param cols  Width of the grid in cells.
+ * @param mode  Sampling mode to apply to the cells.
+ * @returns     The packed texture-glyph grid.
+ */
 export function textureGlyphs(
 	rows: number,
 	cols: number,

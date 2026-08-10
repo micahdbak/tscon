@@ -8,6 +8,16 @@ import {
 } from "./program.ts";
 import { Rect } from "./rect.ts";
 
+/**
+ * Renders a source texture as glyphs onto a {@link Canvas}.
+ *
+ * `Renderer` draws a grid of {@link TexGlyphs} cells, sampling an
+ * application-provided texture per cell according to each cell's
+ * {@link TexGlyphMode}. An application renders into a texture (e.g. a
+ * framebuffer object) and then calls {@link draw} with a matching
+ * {@link TexGlyphs} grid to draw that texture directly or as dithered
+ * coloured characters.
+ */
 export class Renderer {
 	private gl_program: WebGLProgram;
 
@@ -19,10 +29,23 @@ export class Renderer {
 
 	private resized: boolean;
 
+	/** The {@link Canvas} this renderer draws into. */
 	public canvas: Canvas;
 
+	/**
+	 * Whether to use {@link Canvas.user_font} for non-box glyphs when
+	 * available. Set to `true` by the application after assigning a font
+	 * texture to `canvas.user_font`; automatically falls back to the bitmap
+	 * font if `user_font` is `null`.
+	 */
 	public use_user_font: boolean;
 
+	/**
+	 * Initializes the renderer for use.
+	 * Listens for `"resize"` events from the canvas.
+	 *
+	 * @param canvas  The canvas to draw into.
+	 */
 	constructor(canvas: Canvas) {
 		this.canvas = canvas;
 		const gl = canvas.gl;
@@ -134,6 +157,27 @@ export class Renderer {
 		});
 	}
 
+	/**
+	 * Draw a {@link TexGlyphs} grid sampling `texture` into a region of the
+	 * canvas.
+	 *
+	 * `tglyphs.rows`/`cols` must match `dst.rows`/`cols`; otherwise the
+	 * draw is skipped. `dst` is in canvas cell coordinates and may extend
+	 * beyond the canvas; the shader clips via NDC. Use a `tglyphs` grid
+	 * sized to the texture's aspect so the texture isn't distorted.
+	 *
+	 * @example
+	 * ```ts
+	 * renderer.draw(tglyphs, texture, {
+	 *   row: 0, col: 0,
+	 *   rows: tglyphs.rows, cols: tglyphs.cols,
+	 * });
+	 * ```
+	 *
+	 * @param tglyphs  Texture-glyph grid describing how to sample.
+	 * @param texture  Source texture to sample from.
+	 * @param dst      Destination region on the canvas (cells).
+	 */
 	draw(tglyphs: TexGlyphs, texture: WebGLTexture, dst: Rect) {
 		if (tglyphs.rows !== dst.rows || tglyphs.cols !== dst.cols) {
 			console.log(
