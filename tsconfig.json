@@ -1,0 +1,25 @@
+{
+	"compilerOptions": {
+		/* Emit */
+		"outDir": "dist",
+		"rootDir": "src",
+		"declaration": true,
+		"sourceMap": false,
+
+		/* Language & environment */
+		"target": "esnext",
+		"lib": ["esnext", "dom", "dom.iterable"],
+		"module": "nodenext",
+		"moduleResolution": "nodenext",
+		/* Source imports use `.ts` extensions (runnable by Bun as-is);
+		   tsc rewrites them to `.js` in the emitted dist output. */
+		"rewriteRelativeImportExtensions": true,
+		"verbatimModuleSyntax": true,
+		"isolatedModules": true,
+
+		/* Strictness */
+		"strict": true,
+		"skipLibCheck": true
+	},
+	"include": ["src"]
+}

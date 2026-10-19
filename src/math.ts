@@ -266,7 +266,7 @@ export class Mat4 {
 	 *
 	 * @example
 	 * ```ts
-	 * import { Mat4 } from "@creat/tscon";
+	 * import { Mat4 } from "@micahdb/tscon";
 	 *
 	 * const mv = Mat4.create();
 	 * Mat4.multiply(mv, view, model);
@@ -492,7 +492,6 @@ export class Mat4 {
 	static translation(tx: number, ty: number, tz: number): Float32Array {
 		const m = Mat4.create();
 
-		// deno-fmt-ignore
 		Mat4.set(m,
 			 1, 0, 0, 0,
 			 0, 1, 0, 0,
@@ -513,7 +512,6 @@ export class Mat4 {
 	static scale(sx: number, sy: number, sz: number): Float32Array {
 		const m = Mat4.create();
 
-		// deno-fmt-ignore
 		Mat4.set(m,
 			 sx, 0, 0, 0,
 			 0, sy, 0, 0,
@@ -541,7 +539,6 @@ export class Mat4 {
 
 		switch (axis) {
 			case "x":
-				// deno-fmt-ignore
 				Mat4.set(m,
 					 1, 0, 0, 0,
 					 0, c, s, 0,
@@ -551,7 +548,6 @@ export class Mat4 {
 				break;
 
 			case "y":
-				// deno-fmt-ignore
 				Mat4.set(m,
 					 c, 0, -s, 0,
 					 0, 1, 0, 0,
@@ -561,7 +557,6 @@ export class Mat4 {
 				break;
 
 			case "z":
-				// deno-fmt-ignore
 				Mat4.set(m,
 					 c, s, 0, 0,
 					 -s, c, 0, 0,

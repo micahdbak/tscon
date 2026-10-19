@@ -88,7 +88,7 @@ export function charCodeInCp437(code_point: number): number {
  *
  * @example
  * ```ts
- * import { renderCp437 } from "@creat/tscon";
+ * import { renderCp437 } from "@micahdb/tscon";
  *
  * const canvas = document.getElementById("2d") as HTMLCanvasElement;
  * await renderCp437(canvas, "160px 'JetBrains Mono'");

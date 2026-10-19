@@ -1,12 +1,12 @@
 import { renderer_frag, renderer_vert } from "./shaders.ts";
 import { Canvas } from "./canvas.ts";
-import { TexGlyphs } from "./glyphs.ts";
+import type { TexGlyphs } from "./glyphs.ts";
 import {
 	compileProgram,
 	getAttribLocations,
 	getUniformLocations,
 } from "./program.ts";
-import { Rect } from "./rect.ts";
+import type { Rect } from "./rect.ts";
 
 /**
  * Renders a source texture as glyphs onto a {@link Canvas}.

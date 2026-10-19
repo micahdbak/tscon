@@ -1,7 +1,8 @@
 import { terminal_frag, terminal_vert } from "./shaders.ts";
 import { Canvas } from "./canvas.ts";
-import { Glyphs, textGlyphs } from "./glyphs.ts";
-import { Rect } from "./rect.ts";
+import { textGlyphs } from "./glyphs.ts";
+import type { Glyphs } from "./glyphs.ts";
+import type { Rect } from "./rect.ts";
 
 import {
 	compileProgram,

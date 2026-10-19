@@ -61,7 +61,7 @@ function finalSpaceIdx(text: string, start: number): number {
  *
  * @example
  * ```ts
- * import { textToLines } from "@creat/tscon";
+ * import { textToLines } from "@micahdb/tscon";
  *
  * textToLines("hello world", 80, true);   // ["hello world"]
  * ```
@@ -328,7 +328,7 @@ export type Glyphs = {
  *
  * @example
  * ```ts
- * import { textGlyphs } from "@creat/tscon";
+ * import { textGlyphs } from "@micahdb/tscon";
  *
  * // bright-blue on black "Link", 4 cols wide
  * const g = textGlyphs("\\F4\\b0Link", 4, false);
@@ -594,7 +594,7 @@ export type TexGlyphs = {
  *
  * @example
  * ```ts
- * import { TexGlyphMode, textureGlyphs } from "@creat/tscon";
+ * import { TexGlyphMode, textureGlyphs } from "@micahdb/tscon";
  *
  * // whole-canvas glyphs that sample the texture as coloured characters
  * const tg = textureGlyphs(canvas.rows, canvas.cols, TexGlyphMode.GLYPHS);

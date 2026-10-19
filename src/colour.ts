@@ -11,7 +11,7 @@
  *
  * @example
  * ```ts
- * import { Colour } from "@creat/tscon";
+ * import { Colour } from "@micahdb/tscon";
  *
  * // bright-blue foreground on black background
  * const text = "\\F4\\b0Link";
@@ -50,12 +50,11 @@ export enum Colour {
  *
  * @example
  * ```ts
- * import { Colour, PALETTE } from "@creat/tscon";
+ * import { Colour, PALETTE } from "@micahdb/tscon";
  *
  * const [r, g, b] = PALETTE.slice(Colour.BLUE * 3, Colour.BLUE * 3 + 3);
  * ```
  */
-// deno-fmt-ignore
 export const PALETTE = [
 	// dark colours
 	0x08, 0x08, 0x08, // Colour.BLACK

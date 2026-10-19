@@ -13,7 +13,7 @@
  *
  * @example
  * ```ts
- * import { Canvas, loadTexture } from "@creat/tscon";
+ * import { Canvas, loadTexture } from "@micahdb/tscon";
  *
  * const canvas = new Canvas(element);
  * const texture = await loadTexture(canvas.gl, "/images/portrait.jpeg");
@@ -89,7 +89,7 @@ export function loadTexture(
  *
  * @example
  * ```ts
- * import { Canvas, loadCubeMap } from "@creat/tscon";
+ * import { Canvas, loadCubeMap } from "@micahdb/tscon";
  *
  * const canvas = new Canvas(element);
  * const skybox = await loadCubeMap(canvas.gl, [

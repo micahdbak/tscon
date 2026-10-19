@@ -137,7 +137,6 @@ export class Canvas extends EventTarget {
 
 		if (!gl) {
 			throw new Error("No WebGL context");
-			return;
 		}
 
 		this.gl = gl;
