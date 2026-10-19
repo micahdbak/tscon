@@ -21,6 +21,12 @@ enum DeltaMode {
  * dimensions change and `"wheel"` (a `CustomEvent` with `detail.rows`) on
  * scroll. {@link Terminal} and {@link Renderer} are constructed with a
  * `Canvas` and read its state every frame.
+ *
+ * Pointer positions are computed relative to the element's bounding
+ * rectangle, so the canvas may be placed anywhere on a page, including
+ * embedded in a scrolling document. Keyboard scrolling engages only
+ * while the pointer is over the canvas or the canvas has DOM focus
+ * (the constructor makes the element focusable if it is not already).
  */
 export class Canvas extends EventTarget {
 	/**
@@ -141,6 +147,12 @@ export class Canvas extends EventTarget {
 
 		this.gl = gl;
 
+		// make the canvas keyboard-focusable so keyboard scrolling is
+		// reachable without a pointer (unless the app set its own)
+		if (!element.hasAttribute("tabindex")) {
+			element.tabIndex = 0;
+		}
+
 		this.mouse_wheel_px = 0;
 
 		this.scroll_keys_held = new Set();
@@ -201,6 +213,11 @@ export class Canvas extends EventTarget {
 
 		this.element.addEventListener("pointerleave", () => {
 			this.mouse_down = false;
+			this.stopAllKeyScroll();
+		});
+
+		this.element.addEventListener("blur", () => {
+			this.stopAllKeyScroll();
 		});
 
 		this.element.addEventListener(
@@ -230,6 +247,12 @@ export class Canvas extends EventTarget {
 				return;
 			}
 
+			// only scroll when the canvas is hovered or focused, so an
+			// embedded canvas never hijacks the page's keys
+			if (!this.hasKeyboardFocus()) {
+				return;
+			}
+
 			if (this.scrollDeltaForKey(e.key) === 0) {
 				return;
 			}
@@ -253,16 +276,7 @@ export class Canvas extends EventTarget {
 		});
 
 		window.addEventListener("blur", () => {
-			this.scroll_keys_held.clear();
-
-			if (this.scroll_delay !== undefined) {
-				clearTimeout(this.scroll_delay);
-				this.scroll_delay = undefined;
-			}
-			if (this.scroll_timer !== undefined) {
-				clearInterval(this.scroll_timer);
-				this.scroll_timer = undefined;
-			}
+			this.stopAllKeyScroll();
 
 			this.mouse_down = false;
 			this.mouse_click = false;
@@ -325,17 +339,22 @@ export class Canvas extends EventTarget {
 	}
 
 	private mouseMove(client_x: number, client_y: number) {
-		const dpr = window.devicePixelRatio || 1;
+		const rect = this.element.getBoundingClientRect();
 
-		const actual_client_y = client_y * dpr;
-		const actual_client_x = client_x * dpr;
+		const x = client_x - rect.left;
+		const y = client_y - rect.top;
 
-		this.mouse_row = Math.floor(
-			actual_client_y / this.actual_cell_height,
-		);
-		this.mouse_col = Math.floor(
-			actual_client_x / this.actual_cell_width,
-		);
+		if (x < 0 || y < 0 || x >= rect.width || y >= rect.height) {
+			this.mouse_row = undefined;
+			this.mouse_col = undefined;
+
+			return;
+		}
+
+		// the DPR cancels: a CSS-pixel fraction of the element maps
+		// directly onto the cell grid
+		this.mouse_row = Math.floor((y / rect.height) * this.rows);
+		this.mouse_col = Math.floor((x / rect.width) * this.cols);
 	}
 
 	private mouseScroll(delta_mode: DeltaMode, delta: number) {
@@ -374,6 +393,34 @@ export class Canvas extends EventTarget {
 		this.dispatchEvent(
 			new CustomEvent("wheel", { detail: { rows } }),
 		);
+	}
+
+	/**
+	 * Whether keyboard scrolling should currently engage: the pointer is
+	 * over the canvas, or the canvas has DOM focus. This keeps an
+	 * embedded canvas from stealing keypresses meant for the page, and
+	 * makes the canvas's own scrolling available to keyboard-only users
+	 * via tab focus.
+	 */
+	private hasKeyboardFocus(): boolean {
+		return (
+			document.activeElement === this.element ||
+			this.mouse_row !== undefined
+		);
+	}
+
+	private stopAllKeyScroll() {
+		this.scroll_keys_held.clear();
+
+		if (this.scroll_delay !== undefined) {
+			clearTimeout(this.scroll_delay);
+			this.scroll_delay = undefined;
+		}
+
+		if (this.scroll_timer !== undefined) {
+			clearInterval(this.scroll_timer);
+			this.scroll_timer = undefined;
+		}
 	}
 
 	private scrollDeltaForKey(key: string): number {

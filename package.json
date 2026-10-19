@@ -1,6 +1,6 @@
 {
 	"name": "@micahdb/tscon",
-	"version": "0.1.1",
+	"version": "0.1.2",
 	"description": "WebGL 2.0 text-mode graphics in TypeScript.",
 	"keywords": [
 		"webgl",
@@ -10,7 +10,9 @@
 		"console",
 		"cp437",
 		"typography",
-		"canvas"
+		"canvas",
+		"pi-package",
+		"agent-skills"
 	],
 	"license": "MIT",
 	"author": "Micah Baker",
@@ -26,7 +28,8 @@
 		}
 	},
 	"files": [
-		"dist"
+		"dist",
+		"skills"
 	],
 	"sideEffects": false,
 	"scripts": {

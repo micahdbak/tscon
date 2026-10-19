@@ -168,7 +168,8 @@ export class Terminal {
 	 * otherwise the blit is skipped. Both rectangles are clipped to their
 	 * respective bounds, with negative origins handled by shifting both
 	 * `src` and `dst` together, so partial off-screen copies work as
-	 * expected.
+	 * expected. The passed rectangles are copied before clipping, so they
+	 * are never modified.
 	 *
 	 * This only writes to the in-memory framebuffer; call {@link draw} to
 	 * rasterise it.
@@ -192,6 +193,10 @@ export class Terminal {
 			);
 			return;
 		}
+
+		// work on copies so the caller's rects are never modified
+		src = { ...src };
+		dst = { ...dst };
 
 		// handle negatives
 
