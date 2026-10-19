@@ -153,7 +153,7 @@ export class Canvas extends EventTarget {
 		this.mouse_click = false;
 
 		this.palette = new Float32Array(
-			PALETTE.map((byte) => byte / 0xff),
+			PALETTE.flat().map((byte) => byte / 0xff),
 		);
 
 		this.bitmap_font = loadModernDosTexture(gl);

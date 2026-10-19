@@ -1,13 +1,7 @@
 {
 	"name": "@micahdb/tscon",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"description": "WebGL 2.0 text-mode graphics in TypeScript.",
-	"license": "MIT",
-	"author": "Micah Baker",
-	"repository": {
-		"type": "git",
-		"url": "git+https://github.com/micahdbak/tscon.git"
-	},
 	"keywords": [
 		"webgl",
 		"webgl2",
@@ -18,8 +12,13 @@
 		"typography",
 		"canvas"
 	],
+	"license": "MIT",
+	"author": "Micah Baker",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/micahdbak/tscon.git"
+	},
 	"type": "module",
-	"sideEffects": false,
 	"exports": {
 		".": {
 			"types": "./dist/index.d.ts",
@@ -29,9 +28,7 @@
 	"files": [
 		"dist"
 	],
-	"publishConfig": {
-		"access": "public"
-	},
+	"sideEffects": false,
 	"scripts": {
 		"lint": "oxlint src scripts",
 		"shaders": "bun run scripts/shaders.ts",
@@ -41,5 +38,8 @@
 	"devDependencies": {
 		"oxlint": "^1.88.0",
 		"typescript": "^7.0.2"
+	},
+	"publishConfig": {
+		"access": "public"
 	}
 }
