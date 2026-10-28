@@ -1,249 +1,9 @@
+import { scanEscapeAt } from "./escape.ts";
+import type { EscapeScan } from "./escape.ts";
+import { TAB_WIDTH, textToLines } from "./wrap.ts";
+import type { Wrap } from "./wrap.ts";
 import { Colour } from "./colour.ts";
 import { charCodeInCp437 } from "./cp437.ts";
-
-/**
- * Number of columns a tab advances the cursor by.
- *
- * Tabs in text processed by {@link textToLines} and {@link textGlyphs}
- * advance the column position to the next multiple of this width.
- */
-export const TAB_WIDTH = 8;
-
-function finalSpaceIdx(text: string, start: number): number {
-	// skip remaining white space
-	while (
-		start < text.length &&
-		(text[start] === " " || text[start] === "\t")
-	) {
-		start++;
-	}
-
-	// just incase there was a newline
-	if (start < text.length && text[start] === "\n") {
-		start++;
-	}
-
-	// reached the end of text
-	if (start >= text.length) {
-		return -1;
-	}
-
-	// return index of last space
-	return start - 1;
-}
-
-/**
- * Layout `text` into lines no wider than `cols` columns.
- *
- * This is the line-breaking pass used by {@link textGlyphs}. It interprets
- * the tscon text escape sequences so they are not counted against the
- * column budget, and returns the raw visible content of each line as a
- * string (still containing the escape codes for later processing).
- *
- * The following escape sequences are recognised and treated as taking up
- * zero columns:
- *
- * - `\\` -- a literal backslash (collapses to one displayed char)
- * - `\aX` and `\aX{options}` -- an anchor in group `X` (0-9), with an
- *   optional `{...}` options string
- * - `\fX` / `\FX` -- set foreground to colour `X` (dark / bright)
- * - `\bX` / `\BX` -- set background to colour `X` (dark / bright)
- *
- * Newlines always break the line. A backslash immediately followed by a
- * newline is a line continuation: the two characters are removed and the
- * following content joins the current line. Tabs advance to the next
- * multiple of {@link TAB_WIDTH}.
- *
- * When `wrap` is `true`, lines longer than `cols` are wrapped at the most
- * recent space (or broken mid-word if a single word fills a whole line).
- * When `wrap` is `false`, lines longer than `cols` are truncated at the
- * end of the line and the rest of that logical line is discarded.
- *
- * @example
- * ```ts
- * import { textToLines } from "@micahdb/tscon";
- *
- * textToLines("hello world", 80, true);   // ["hello world"]
- * ```
- *
- * @param text  The text to lay out, possibly with escape sequences.
- * @param cols  Maximum number of visible columns per line. If `<= 0`, an
- *              empty array is returned.
- * @param wrap  Whether to word-wrap long lines (`true`) or truncate them
- *              (`false`).
- * @returns     The laid-out visible lines, with escape sequences preserved.
- */
-export function textToLines(
-	text: string,
-	cols: number,
-	wrap: boolean,
-): string[] {
-	const lines: string[] = [];
-
-	if (cols <= 0) {
-		return lines; // empty
-	}
-
-	let start = 0;
-	let running_cols = 0;
-	let last_space = -1;
-
-	// "text that breaks \
-	// a line into two"
-	// ->
-	// "text that breaks a line into two"
-	text = text.replaceAll("\\\n", "");
-
-	for (let i = 0; i < text.length; i++) {
-		const c = text[i];
-		let escape = c === "\\";
-
-		// single back slash
-		if (escape && i + 1 < text.length && text[i + 1] === "\\") {
-			i++; // skip one character
-			escape = false;
-		}
-
-		// anchor escape sequence
-		// \aX                 : anchor in group X, no options
-		// \aX{options string} : anchor in group X, with options
-		if (
-			escape && i + 2 < text.length && text[i + 1] === "a" &&
-			!isNaN(Number(text[i + 2]))
-		) {
-			let skip_chars = 2;
-
-			// options string
-			if (i + 3 < text.length && text[i + 3] === "{") {
-				const closing_brace = text.indexOf("}", i + 3);
-
-				if (closing_brace > i + 3) {
-					// skip right until the closing brace
-					skip_chars = closing_brace - i;
-				} // else, no matching closing brace, ignore "{"
-			}
-
-			i += skip_chars;
-
-			continue; // i++
-		}
-
-		// colours escape sequence
-		// \fX : set foreground to X, dark
-		// \FX : set foreground to X, bright
-		// \bX : set background to X, dark
-		// \BX : set background to X, bright
-		if (
-			escape &&
-			i + 2 < text.length &&
-			"fFbB".includes(text[i + 1]) &&
-			!isNaN(Number(text[i + 2]))
-		) {
-			// skip the 3 char combo
-			i += 2;
-
-			continue; // i++
-		}
-
-		// newline
-		if (c === "\n") {
-			lines.push(text.slice(start, i).trimEnd());
-
-			start = i + 1;
-			running_cols = 0;
-			last_space = -1;
-
-			continue;
-		}
-
-		// tab
-		if (c === "\t") {
-			const cols_to_tab = TAB_WIDTH -
-				(running_cols % TAB_WIDTH);
-
-			if (running_cols + cols_to_tab > cols) {
-				lines.push(text.slice(start, i).trimEnd());
-
-				if (!wrap) {
-					i = text.indexOf("\n", i + 1);
-				} else {
-					i = finalSpaceIdx(text, i + 1);
-				}
-
-				// end of text
-				if (i < 0) {
-					break;
-				}
-
-				start = i + 1;
-				running_cols = 0;
-				last_space = -1;
-			} else {
-				running_cols += cols_to_tab;
-				last_space = i;
-			}
-
-			continue;
-		}
-
-		// space
-		if (c === " ") {
-			last_space = i;
-		}
-
-		// exceeding available width
-		if (running_cols + 1 > cols) {
-			// skip rest of line if not wrapping
-			if (!wrap) {
-				lines.push(text.slice(start, i).trimEnd());
-
-				i = text.indexOf("\n", i + 1);
-
-				// end of text
-				if (i < 0) {
-					break;
-				}
-
-				start = i + 1;
-				running_cols = 0;
-				last_space = -1;
-
-				continue;
-			}
-
-			// this is a continuous word that filled the whole line
-			if (last_space < 0) {
-				lines.push(text.slice(start, i).trimEnd());
-
-				start = i;
-				running_cols = 0;
-				i--;
-
-				continue;
-			}
-
-			// otherwise, will break at last space
-
-			lines.push(text.slice(start, last_space).trimEnd());
-
-			i = finalSpaceIdx(text, last_space);
-			start = i + 1;
-			running_cols = 0;
-			last_space = -1;
-
-			continue;
-		}
-
-		running_cols++;
-	}
-
-	// push last line if it isn't a space
-	if (start < text.length) {
-		lines.push(text.slice(start));
-	}
-
-	return lines;
-}
 
 /**
  * A named position inside a {@link Glyphs} block, produced by an `\aX`
@@ -282,6 +42,10 @@ export type Anchor = {
  * `data` is laid out row-major with `rows * cols` entries, so the glyph at
  * `(row, col)` is at index `row * cols + col`.
  *
+ * A cell left as zero is blank: the shader clips its quad entirely, so
+ * whatever was drawn beneath shows through. Characters on the all-zero
+ * colour byte render as the default white-on-black.
+ *
  * {@link anchors} records the positions of every `\aX` anchor found while
  * rendering, keyed by group number 0-9.
  *
@@ -302,6 +66,41 @@ export type Glyphs = {
 	anchors: Record<number, Anchor[]>;
 };
 
+type ColourState = { fg: number; bg: number };
+
+function emptyGlyphs(): Glyphs {
+	return {
+		data: new Uint16Array(),
+		rows: 0,
+		cols: 0,
+		anchors: {},
+	};
+}
+
+function recordAnchor(
+	glyphs: Glyphs,
+	group: number,
+	options: string | null,
+	row: number,
+	col: number,
+): void {
+	const anchors = glyphs.anchors[group] ?? [];
+
+	anchors.push({ options, row, col });
+	glyphs.anchors[group] = anchors;
+}
+
+function applyColour(colours: ColourState, scan: Extract<EscapeScan, { kind: "colour" }>): void {
+	// clamp to the dark half; the bright bit is added by the capital form
+	const value = Math.min(scan.num, 7) + (scan.bright ? 8 : 0);
+
+	if (scan.attribute === "fg") {
+		colours.fg = value;
+	} else {
+		colours.bg = value;
+	}
+}
+
 /**
  * Render `text` into a grid of terminal glyphs `cols` wide.
  *
@@ -309,22 +108,20 @@ export type Glyphs = {
  * to lay the text out, then encodes each visible character as a packed
  * 16-bit glyph (CP437 code + colour pair) into the resulting {@link Glyphs}.
  *
- * The escape sequences understood by the text format are interpreted here:
- *
- * - `\\` -- emits a single literal backslash
- * - `\aX` / `\aX{options}` -- records an anchor in group `X` (0-9) at the
- *   current position, with optional `options` string (see {@link Anchor})
- * - `\fX` / `\FX` -- set foreground colour to `X` (dark / bright)
- * - `\bX` / `\BX` -- set background colour to `X` (dark / bright)
- *
- * Colours `X` are clamped to 0-7; the `F`/`B` (capital) variants add 8 to
- * select the bright half of the palette. The initial foreground is
- * {@link Colour.WHITE} and the initial background is {@link Colour.BLACK}.
+ * The escape sequences understood by the text format are interpreted here
+ * (see {@link scanEscapeAt}): `\\` emits a single literal backslash, `\aX`
+ * records an anchor, and the colour escapes set the colours of the
+ * characters that follow. Colour digits are clamped to the dark half
+ * (0-7); the `F`/`B` capitals add 8 to select the bright half. The initial
+ * foreground is {@link Colour.WHITE} and the initial background is
+ * {@link Colour.BLACK}.
  *
  * Tabs advance the column to the next multiple of {@link TAB_WIDTH} but
- * do not emit anything. Characters outside the CP437 range map to 0
- * (blank), and trailing space on the default colour is left as zero so it
- * does not overwrite whatever is already on the console.
+ * do not emit anything. Characters outside the CP437 range map through
+ * {@link charCodeInCp437}. A space rendered on the all-black colour byte
+ * (0) is left as zero, which the shader clips -- but a space on the
+ * default white-on-black colours paints a normal (black-backgrounded)
+ * quad; zero whitespace cells yourself when compositing over textures.
  *
  * @example
  * ```ts
@@ -337,161 +134,60 @@ export type Glyphs = {
  * @param text  The text to render, with escape sequences.
  * @param cols  Width of the grid in cells. If `<= 0`, an empty grid is
  *              returned.
- * @param wrap  Whether to word-wrap long lines (`true`) or truncate them
- *              (`false`).
+ * @param wrap  How to lay out lines longer than `cols`: `true` word-wraps
+ *              them, `false` truncates them, `"hard"` breaks them at
+ *              exactly `cols` characters.
  * @returns     The rendered glyph grid, with anchors populated.
  */
-export function textGlyphs(text: string, cols: number, wrap: boolean): Glyphs {
+export function textGlyphs(text: string, cols: number, wrap: Wrap): Glyphs {
 	if (cols <= 0) {
-		return {
-			data: new Uint16Array(),
-			rows: 0,
-			cols: 0,
-			anchors: {},
-		};
+		return emptyGlyphs();
 	}
 
 	const lines = textToLines(text, cols, wrap);
-	const rows = lines.length;
 
-	if (rows === 0) {
-		return {
-			data: new Uint16Array(),
-			rows: 0,
-			cols: 0,
-			anchors: {},
-		};
+	if (lines.length === 0) {
+		return emptyGlyphs();
 	}
 
 	const glyphs = {
-		data: new Uint16Array(rows * cols),
-		rows,
-		cols: cols,
+		data: new Uint16Array(lines.length * cols),
+		rows: lines.length,
+		cols,
 		anchors: {} as Record<number, Anchor[]>,
 	};
 
-	let fg: number = Colour.WHITE;
-	let bg: number = Colour.BLACK;
+	const colours: ColourState = { fg: Colour.WHITE, bg: Colour.BLACK };
 
-	for (let row = 0; row < rows; row++) {
-		const line = lines[row];
+	for (let row = 0; row < glyphs.rows; row++) {
+		const line = lines[row]!;
 		let col = 0;
 
 		for (let i = 0; i < line.length; i++) {
-			const c = line[i];
-			let escape = c === "\\";
+			const scan = scanEscapeAt(line, i);
 
-			// \\ : display a single back slash
-			if (
-				escape && i + 1 < line.length &&
-				line[i + 1] === "\\"
-			) {
-				i++; // this will be displayed as a single character
-				escape = false; // skip below checks
-			}
-
-			// anchor escape sequence
-			// \aX                 : anchor in group X, no options
-			// \aX{options string} : anchor in group X, with options
-			if (
-				escape && i + 2 < line.length &&
-				line[i + 1] === "a" &&
-				!isNaN(Number(line[i + 2]))
-			) {
-				const num = Math.max(
-					Math.min(Number(line[i + 2]), 9),
-					0,
-				); // 0..9
-				let skip_chars = 2;
-
-				if (glyphs.anchors[num] === undefined) {
-					glyphs.anchors[num] = [];
-				}
-
-				const anchors = glyphs.anchors[num] as Anchor[];
-				let options = null;
-
-				// options string
-				if (
-					i + 4 <= line.length &&
-					line[i + 3] === "{"
-				) {
-					const closing_brace = line.indexOf(
-						"}",
-						i + 3,
-					);
-
-					if (closing_brace > i + 3) {
-						// \aX{options} <- take text from inner braces
-						options = line.slice(
-							i + 4,
-							closing_brace,
-						);
-
-						// skip right until the closing brace
-						skip_chars = closing_brace - i;
-					} // else, options = null
-				}
-
-				// empty string should be null
-				if (options === "") {
-					options = null;
-				}
-
-				anchors.push({ options, row, col });
-
-				i += skip_chars;
-
-				continue; // i++
-			}
-
-			// colour escape sequence:
-			// \fX : foreground X, dark
-			// \FX : foreground X, bright
-			// \bX : background X, dark
-			// \BX : background X, bright
-			if (
-				escape &&
-				i + 2 < line.length &&
-				"fFbB".includes(line[i + 1]) &&
-				!isNaN(Number(line[i + 2]))
-			) {
-				const num = Math.max(
-					Math.min(Number(line[i + 2]), 7),
-					0,
-				); // 0..7
-
-				switch (line[i + 1]) {
-					case "f":
-						fg = num;
-
-						break;
-
-					case "F":
-						fg = num + 8;
-
-						break;
-
-					case "b":
-						bg = num;
-
-						break;
-
-					case "B":
-						bg = num + 8;
-
-						break;
-				}
-
-				i += 2;
-
+			if (scan.kind === "anchor") {
+				recordAnchor(glyphs, scan.group, scan.options, row, col);
+				i += scan.chars - 1;
 				continue;
 			}
 
+			if (scan.kind === "colour") {
+				applyColour(colours, scan);
+				i += scan.chars - 1;
+				continue;
+			}
+
+			// an escaped backslash displays one character
+			if (scan.chars === 2) {
+				i++;
+			}
+
+			const c = line[i]!;
+
 			// tab
 			if (c === "\t") {
-				const tab_chars = TAB_WIDTH - (col % TAB_WIDTH);
-				col += tab_chars;
+				col += TAB_WIDTH - (col % TAB_WIDTH);
 
 				continue;
 			}
@@ -501,22 +197,13 @@ export function textGlyphs(text: string, cols: number, wrap: boolean): Glyphs {
 				break;
 			}
 
-			const char_code = charCodeInCp437(
-				line.codePointAt(i) ?? " ".codePointAt(0)!,
-			);
-			const colour_byte = ((fg & 0b1111) << 4) |
-				(bg & 0b1111);
+			const char_code = charCodeInCp437(line.codePointAt(i) ?? 32);
+			const colour_byte = ((colours.fg & 0b1111) << 4) | (colours.bg & 0b1111);
 
-			if (
-				char_code !== " ".codePointAt(0) ||
-				colour_byte !== 0
-			) {
-				const data_idx = row * cols + col;
-
-				const glyph = (colour_byte << 8) |
-					(char_code & 0xff);
-
-				glyphs.data[data_idx] = glyph;
+			// a space on the all-black colour byte is left as zero, which
+			// the shader clips; anything else paints
+			if (char_code !== 32 || colour_byte !== 0) {
+				glyphs.data[row * cols + col] = (colour_byte << 8) | char_code;
 			}
 
 			col++;
@@ -527,10 +214,11 @@ export function textGlyphs(text: string, cols: number, wrap: boolean): Glyphs {
 }
 
 /**
- * How each cell of a {@link TexGlyphs} grid samples its source texture.
+ * Maps the characters of one logical line of source text (escape
+ * sequences included) to the visible positions they occupy after layout,
+ * and back.
  *
- * The value is packed into each texture-glyph and read by the renderer's
- * vertex shader to decide, per cell, how to turn the source texture into a
+ * Escape sequences taker cell, how to turn the source texture into a
  * drawn glyph.
  *
  * - `SAMPLE`    -- render the source texture directly. Each cell is given UV
@@ -578,6 +266,24 @@ export type TexGlyphs = {
 	cols: number;
 };
 
+// MIX/ROWS/COLS alternate cells between SAMPLE and GLYPHS by their
+// pattern; the other modes apply to every cell as-is
+function cellMode(mode: TexGlyphMode, row: number, col: number): TexGlyphMode {
+	switch (mode) {
+		case TexGlyphMode.MIX:
+			return (row + col) % 2 === 0 ? TexGlyphMode.SAMPLE : TexGlyphMode.GLYPHS;
+
+		case TexGlyphMode.ROWS:
+			return row % 2 === 0 ? TexGlyphMode.SAMPLE : TexGlyphMode.GLYPHS;
+
+		case TexGlyphMode.COLS:
+			return col % 2 === 0 ? TexGlyphMode.SAMPLE : TexGlyphMode.GLYPHS;
+
+		default:
+			return mode;
+	}
+}
+
 /**
  * Build a {@link TexGlyphs} grid of `rows` by `cols` cells that samples a
  * texture in the given {@link TexGlyphMode}.
@@ -616,30 +322,13 @@ export function textureGlyphs(
 		cols,
 	};
 
-	const global_mode = mode;
+	for (let index = 0; index < rows * cols; index++) {
+		const row = Math.floor(index / cols);
+		const col = index % cols;
+		const cell_mode = cellMode(mode, row, col);
 
-	for (let data_idx = 0; data_idx < rows * cols; data_idx++) {
-		const row = Math.floor(data_idx / cols);
-		const col = data_idx % cols;
-
-		if (global_mode == TexGlyphMode.MIX) {
-			mode = (row + col) % 2 == 0
-				? TexGlyphMode.SAMPLE
-				: TexGlyphMode.GLYPHS;
-		} else if (global_mode == TexGlyphMode.ROWS) {
-			mode = row % 2 == 0
-				? TexGlyphMode.SAMPLE
-				: TexGlyphMode.GLYPHS;
-		} else if (global_mode == TexGlyphMode.COLS) {
-			mode = col % 2 == 0
-				? TexGlyphMode.SAMPLE
-				: TexGlyphMode.GLYPHS;
-		}
-
-		const glyph = ((row & 0xff) << 24) | ((mode & 0xff) << 16) |
+		tglyphs.data[index] = ((row & 0xff) << 24) | ((cell_mode & 0xff) << 16) |
 			(col & 0xffff);
-
-		tglyphs.data[data_idx] = glyph;
 	}
 
 	return tglyphs;
