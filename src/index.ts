@@ -6,8 +6,10 @@ export { TAB_WIDTH, textToLines } from "./wrap.ts";
 export type { Wrap } from "./wrap.ts";
 export { TextMap } from "./text_map.ts";
 export type { ScreenPos } from "./text_map.ts";
-export { TexGlyphMode, textGlyphs, textureGlyphs } from "./glyphs.ts";
-export type { Anchor, Glyphs, TexGlyphs } from "./glyphs.ts";
+export { textGlyphs } from "./glyphs.ts";
+export type { Anchor, Glyphs } from "./glyphs.ts";
+export { TexGlyphMode, textureGlyphs } from "./tex_glyphs.ts";
+export type { TexGlyphs } from "./tex_glyphs.ts";
 export { Renderer } from "./renderer.ts";
 export { Mat4, Vec4 } from "./math.ts";
 export {

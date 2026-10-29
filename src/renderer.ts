@@ -1,6 +1,6 @@
 import { renderer_frag, renderer_vert } from "./shaders.ts";
 import { Canvas } from "./canvas.ts";
-import type { TexGlyphs } from "./glyphs.ts";
+import type { TexGlyphs } from "./tex_glyphs.ts";
 import {
 	compileProgram,
 	getAttribLocations,
