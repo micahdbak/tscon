@@ -1,6 +1,6 @@
 {
 	"name": "@micahdb/tscon",
-	"version": "0.2.0",
+	"version": "0.2.1",
 	"description": "WebGL 2.0 text-mode graphics in TypeScript.",
 	"keywords": [
 		"webgl",
