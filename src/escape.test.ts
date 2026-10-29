@@ -20,16 +20,55 @@ describe("scanEscapeAt", () => {
 
 	test("anchors scan with their group and payload", () => {
 		expect(scanEscapeAt(`${B}a0`, 0)).toEqual({ kind: "anchor", chars: 3, group: 0, options: null });
-		expect(scanEscapeAt(`${B}a9{a|b}x`, 0)).toEqual({ kind: "anchor", chars: 8, group: 9, options: "a|b" });
+		expect(scanEscapeAt(`${B}a9{a|b}x`, 0)).toEqual({
+			kind: "anchor",
+			chars: 8,
+			group: 9,
+			options: "a|b",
+		});
 		expect(scanEscapeAt(`${B}a0{}x`, 0).options).toBeNull();
-		expect(scanEscapeAt(`${B}a0{x`, 0)).toEqual({ kind: "anchor", chars: 3, group: 0, options: null });
+	});
+
+	test("a payload that never closes on its line is not an escape", () => {
+		// unterminated: the whole anchor renders as raw text
+		expect(scanEscapeAt(`${B}a0{x`, 0)).toEqual({ kind: "text", chars: 1 });
+
+		// a payload may not span a newline, even when a } follows later
+		expect(scanEscapeAt(`${B}a0{x\ny}`, 0)).toEqual({ kind: "text", chars: 1 });
 	});
 
 	test("colours scan with attribute, brightness, and digit", () => {
-		expect(scanEscapeAt(`${B}f0`, 0)).toEqual({ kind: "colour", chars: 3, attribute: "fg", bright: false, num: 0 });
-		expect(scanEscapeAt(`${B}F9`, 0)).toEqual({ kind: "colour", chars: 3, attribute: "fg", bright: true, num: 9 });
-		expect(scanEscapeAt(`${B}b7`, 0)).toEqual({ kind: "colour", chars: 3, attribute: "bg", bright: false, num: 7 });
-		expect(scanEscapeAt(`${B}B3`, 0)).toEqual({ kind: "colour", chars: 3, attribute: "bg", bright: true, num: 3 });
+		expect(scanEscapeAt(`${B}f0`, 0)).toEqual({
+			kind: "colour",
+			chars: 3,
+			attribute: "fg",
+			bright: false,
+			num: 0,
+		});
+
+		expect(scanEscapeAt(`${B}F9`, 0)).toEqual({
+			kind: "colour",
+			chars: 3,
+			attribute: "fg",
+			bright: true,
+			num: 9,
+		});
+
+		expect(scanEscapeAt(`${B}b7`, 0)).toEqual({
+			kind: "colour",
+			chars: 3,
+			attribute: "bg",
+			bright: false,
+			num: 7,
+		});
+
+		expect(scanEscapeAt(`${B}B3`, 0)).toEqual({
+			kind: "colour",
+			chars: 3,
+			attribute: "bg",
+			bright: true,
+			num: 3,
+		});
 	});
 
 	test("the indices are a single digit: anything else is text", () => {

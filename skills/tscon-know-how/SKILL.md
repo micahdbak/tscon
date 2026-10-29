@@ -18,9 +18,12 @@ API map (roles, not signatures):
 - **`Canvas`**: owns the WebGL2 context, cell-grid dimensions, palette, the
   built-in bitmap font and an optional application-provided user font, and all
   mouse/wheel/keyboard state. Everything else is constructed from it.
-- **Text pipeline**: `textGlyphs` / `textToLines` compile escape-formatted text
-  into a `Glyphs` grid; supporting types `Anchor`, `Rect`, `Colour`, `PALETTE`,
-  `TAB_WIDTH`.
+- **Text pipeline**: the `Glyphs` class compiles escape-formatted text into a
+  cell grid plus the position map between source characters and cells
+  (`renderedCell`, `cursorCell`, `cursorIndex`, `rowCols`, `spansFor`,
+  `mapCells`); `textToLines` is the layout pass alone. Supporting types
+  `Cell`, `CellSpan`, `Anchor`, `Rect`, `TextOptions`, `Wrap`, `Colour`,
+  `PALETTE`, `TAB_WIDTH`.
 - **Presenters**: `Terminal` draws a glyph framebuffer; `Renderer` +
   `textureGlyphs` / `TexGlyphMode` draw a texture as cells. Both draw onto a
   `Canvas`.
@@ -40,10 +43,13 @@ API.
    fighting the paradigm; reposition by cells instead.
 2. **Text-as-data.** Content is a plain string with escape sequences
    (`\fX`/`\FX`/`\bX`/`\BX` colours, `\aX{...}` anchors, `\\`, backslash-newline
-   continuation, tabs, word wrap). `textGlyphs(text, cols, wrap)` compiles it
-   once per width into a `Glyphs` grid. Styling lives in the text, not in code.
+   continuation, tabs, word wrap). `new Glyphs(text, cols, opts?)` compiles it
+   once per width into a grid that is both the rendered cells and the
+   source-to-cell map. Styling lives in the text, not in code.
    Escape digits clamp (colours to 0-7 with `F`/`B` adding 8, anchor groups to
-   0-9) and characters outside CP437 render blank.
+   0-9) and characters outside CP437 render blank. An `\aN` anchor captures the
+   position of the glyph that follows it into group N; a `{...}` payload must
+   close on its own line or the anchor renders as raw text.
 3. **GPU-first rendering.** The CPU only packs bytes (2 per cell); the shaders
    do all rasterization: font sampling, colouring, cursor inversion,
    texture-to-ASCII conversion. Compile glyphs when text or width changes, not
@@ -68,7 +74,7 @@ the GPU read the same buffer as two byte attributes with no unpacking.
 A cell of exactly `0` (a space on the default colour) is *blank*: the shader
 clips its quad off-screen, so it never paints. This makes Terminal a transparent
 overlay: text drawn late in the frame floats over textures drawn earlier.
-`textGlyphs` omits default-colour trailing spaces for this reason; a space with
+`Glyphs` omits default-colour trailing spaces for this reason; a space with
 a non-default background is a real, painted cell. A related trick: colour byte 0
 doubles as "default" (white-on-black) when the char is nonzero, so true
 black-on-black is unexpressible, which is harmless because it would be
@@ -183,7 +189,7 @@ const draw = () => {
   }
   if (resized) { // rebuild width-dependent state
     resized = false;
-    content = textGlyphs(CONTENT, contentCols(), true);
+    content = new Glyphs(CONTENT, contentCols());
   }
 
   canvas.clear(); // clears to palette black, resets class_name
@@ -217,11 +223,11 @@ requestAnimationFrame(draw);
    of the same length, and link text uses underscores instead of spaces so word
    wrap (which breaks at spaces) keeps it on one line, because the component
    overlays exactly `text.length` cells. Done when:
-   `textGlyphs(content, cols, true).anchors[0].length` equals your link count.
+   `new Glyphs(content, cols).anchors[0].length` equals your link count.
 2. **Compile per width**:
-   `content = textGlyphs(str, Math.min(80, canvas.cols - padding), true)` at
+   `content = new Glyphs(str, Math.min(80, canvas.cols - padding))` at
    boot and inside the resize branch only. Done when: the per-frame path
-   contains no `textGlyphs` call for static content.
+   contains no `new Glyphs` call for static content.
 3. **Build components once, position them per frame.** Construct component
    objects from the initial anchors (options parsing is your convention), then
    each frame re-read positions from the *current* `content.anchors[group][i]`
@@ -274,9 +280,9 @@ class Link {
     }
     if (this.glyphs === null || hot !== this.hovered) {
       this.hovered = hot;
-      this.glyphs = textGlyphs(
+      this.glyphs = new Glyphs(
         hot ? `\\f0\\F4${this.text}` : `\\F4\\b0${this.text}`,
-        this.text.length, false);
+        this.text.length, { wrap: Wrap.TRUNCATE });
     }
     return this.glyphs;
   }
@@ -284,7 +290,7 @@ class Link {
 ```
 
    Done when: glyph recompilation happens on state transitions only (verify by
-   counting `textGlyphs` calls).
+   counting `new Glyphs` calls).
 
 ## Recipe 3: scrolling
 

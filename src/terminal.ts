@@ -1,7 +1,7 @@
 import { terminal_frag, terminal_vert } from "./shaders.ts";
 import { Canvas } from "./canvas.ts";
-import { textGlyphs } from "./glyphs.ts";
-import type { Glyphs } from "./glyphs.ts";
+import { Glyphs } from "./glyphs.ts";
+import { Wrap } from "./wrap.ts";
 import type { Rect } from "./rect.ts";
 
 import {
@@ -14,9 +14,10 @@ import {
  * Renders a character grid from glyphs onto a {@link Canvas}.
  *
  * `Terminal` owns a `rows` x `cols` framebuffer of packed 16-bit glyph
- * cells (as produced by {@link textGlyphs}) and draws it one instanced
- * quad per cell. A frame is typically: {@link clear}, {@link blit} one or
- * more {@link Glyphs} blocks onto the framebuffer, then {@link draw}.
+ * cells (as produced by the {@link Glyphs} class) and draws it one
+ * instanced quad per cell. A frame is typically: {@link clear},
+ * {@link blit} one or more {@link Glyphs} blocks onto the framebuffer,
+ * then {@link draw}.
  *
  * If {@link detail_text} is set, it is rendered onto the last row as a
  * status line each frame.
@@ -321,10 +322,10 @@ export class Terminal {
 			this.last_detail_text = this.detail_text;
 
 			if (this.detail_text.length > 0) {
-				this.detail_glyphs = textGlyphs(
+				this.detail_glyphs = new Glyphs(
 					"\\B0\\F7" + this.detail_text,
 					this.detail_text.length,
-					false,
+					{ wrap: Wrap.TRUNCATE },
 				);
 			} else {
 				this.detail_glyphs = null;

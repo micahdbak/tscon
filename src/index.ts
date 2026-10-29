@@ -1,13 +1,12 @@
 export { Canvas } from "./canvas.ts";
 export { Terminal } from "./terminal.ts";
+export type { Cell, CellSpan } from "./cell.ts";
+export { Glyphs } from "./glyphs.ts";
+export type { Anchor } from "./glyphs.ts";
 export { hasEscape, scanEscapeAt } from "./escape.ts";
 export type { EscapeScan } from "./escape.ts";
-export { TAB_WIDTH, textToLines } from "./wrap.ts";
-export type { Wrap } from "./wrap.ts";
-export { TextMap } from "./text_map.ts";
-export type { ScreenPos } from "./text_map.ts";
-export { textGlyphs } from "./glyphs.ts";
-export type { Anchor, Glyphs } from "./glyphs.ts";
+export { TAB_WIDTH, Wrap, textToLines } from "./wrap.ts";
+export type { TextOptions } from "./wrap.ts";
 export { TexGlyphMode, textureGlyphs } from "./tex_glyphs.ts";
 export type { TexGlyphs } from "./tex_glyphs.ts";
 export { Renderer } from "./renderer.ts";

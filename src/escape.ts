@@ -22,8 +22,9 @@ export type EscapeScan =
  *
  * - `\\` -- an escaped backslash, displaying one backslash
  * - `\aX` and `\aX{options}` -- an anchor in group `X` (0-9), with an
- *   optional `{...}` options string; an unterminated `{` renders
- *   literally after the escape
+ *   optional `{...}` options string; a `{` payload must close on its own
+ *   line, and one that never closes is not an escape at all, so the
+ *   whole anchor renders as raw text
  * - `\fX` / `\FX` -- set foreground to colour `X` (dark / bright)
  * - `\bX` / `\BX` -- set background to colour `X` (dark / bright)
  *
@@ -80,10 +81,12 @@ function scanAnchor(text: string, index: number, group: number): EscapeScan {
 	}
 
 	const closing = text.indexOf("}", index + 4);
+	const line_end = text.indexOf("\n", index + 4);
 
-	// an unterminated brace renders literally after the escape
-	if (closing === -1) {
-		return { kind: "anchor", chars: 3, group, options: null };
+	// a payload must close on its own line; one that never closes is
+	// not an escape, so the anchor renders as raw text
+	if (closing === -1 || (line_end !== -1 && closing > line_end)) {
+		return { kind: "text", chars: 1 };
 	}
 
 	const options = text.slice(index + 4, closing);
