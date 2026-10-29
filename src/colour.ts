@@ -5,9 +5,8 @@
  * colours (8..15). Glyph text encodes a foreground and background colour as
  * 4-bit values, the high bit of which selects the bright half of the palette.
  *
- * Use these members with the `Colour` escape sequences understood by
- * {@link textGlyphs} (`\fX`, `\FX`, `\bX`, `\BX`) and as the `fg`/`bg`
- * indices when building glyphs programmatically.
+ * Use these members with the colour escapes understood by {@link Glyphs}
+ * (`\fX`, `\FX`, `\bX`, `\BX`) and when choosing colours in code.
  *
  * @example
  * ```ts

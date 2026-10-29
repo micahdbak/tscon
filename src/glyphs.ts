@@ -7,21 +7,17 @@ import type { Cell, CellSpan } from "./cell.ts";
 import type { Rect } from "./rect.ts";
 
 /**
- * A named position inside a {@link Glyphs} block, produced by an `\aX`
- * anchor escape sequence in the source text.
+ * A position that tscon text marks for the application, produced by an
+ * `\aX` anchor escape sequence.
  *
- * The anchor occupies zero columns. It captures the position of the
- * glyph that follows it: the cell where the next visible character
- * renders -- possibly on a later wrapped row, past a tab, or at the end
- * of the last row when nothing follows. `options` carries the escape's
- * `{...}` payload verbatim, or `null` when the braces are absent or
- * empty. A payload that never closes on its line renders as raw text
- * instead and records no anchor.
+ * An anchor takes no columns of its own: it marks the cell of the character
+ * that follows it, which may be on a later wrapped row, past a tab, or at
+ * the end of the last row when nothing follows. `options` is the escape's
+ * `{...}` payload, or `null` when the braces are absent or empty.
  *
- * Anchors are keyed by group number 0-9 in {@link Glyphs.anchors}, in
- * source order. What a group means, and what draws over the captured
- * cells, is the application's business: links, images, headings --
- * whatever the downstream code blits over them.
+ * The application decides what each group (0-9) means and what to draw over
+ * the marked cell: a link, an image, a heading, anything. See
+ * {@link Glyphs.anchors}.
  *
  * @example
  * ```ts
@@ -44,21 +40,20 @@ export type Anchor = {
 };
 
 /**
- * Text compiled for the terminal: the source text, its wrapped layout,
- * the rendered grid of glyph cells, and the translation between source
- * character indices and cell positions -- one object, one compile.
+ * Text compiled for the terminal: the wrapped rows, the cells to draw,
+ * the anchors the text declares, and the translation between source
+ * character indices and cell positions.
  *
- * Construction runs the full pipeline: {@link textToLines} lays the text
- * out into verbatim source slices, then one walk renders the cells (and
- * records anchors) while remembering which source character ended up in
- * which cell. Compile once per text and width, then read positions from
- * the result; nothing here touches the GPU.
+ * Compile once per text and width, then read from the result. Blit it with
+ * {@link Terminal.blit}, place interactive components at
+ * {@link Glyphs.anchors}, and ask where anything went with
+ * {@link Glyphs.renderedCell}, {@link Glyphs.cursorCell},
+ * {@link Glyphs.cursorIndex}, {@link Glyphs.rowCols},
+ * {@link Glyphs.spansFor}, and {@link Glyphs.mapCells}.
  *
- * All positions are region-relative: `row` is the wrapped row within
- * the grid and `col` the column, exactly the coordinates
- * {@link Terminal.blit}'s `src` and `dst` rects use. Zero-width escapes
- * (anchors, colours) occupy no cells; a cursor resting on one displays
- * on the cell of the glyph that follows it.
+ * Positions are region-relative: rows are counted from the top of the grid
+ * and columns from its left, the same coordinates {@link Rect} and
+ * {@link Terminal.blit} use.
  *
  * @example
  * ```ts
@@ -66,20 +61,24 @@ export type Anchor = {
  *
  * const g = new Glyphs("hello \\f1world", 80);
  *
- * g.data;               // packed cells, ready for Terminal.blit
- * g.renderedCell(6);    // { row: 0, col: 6 }: where "w" renders
- * g.cursorIndex(0, 9);  // 8: the source character under a click
- * g.anchors[0];         // \a0 anchors and the cells they captured
+ * g.rows;                // 1
+ * g.renderedCell(9);     // { row: 0, col: 6 }: where "w" draws
+ * g.cursorIndex(0, 6);   // 9: the source character under a click there
+ * g.anchors[0];          // \a0 anchors, if the text declared any
  * ```
  */
 export class Glyphs {
-	/** The source text, unaltered from construction. */
+	/** The source text, exactly as it was given to the constructor. */
 	readonly sourceText: string;
 
-	/** The laid-out text: one string per wrapped row, escapes preserved. */
+	/** The laid-out text: one string per wrapped row, escapes included. */
 	readonly wrappedText: string[];
 
-	/** Packed glyph cells, row-major, `rows * cols` entries. */
+	/**
+	 * The cells to draw, row-major with `rows * cols` entries, one 16-bit
+	 * value per cell. A cell of `0` is blank and paints nothing when
+	 * blitted.
+	 */
 	readonly data: Uint16Array;
 
 	/** Number of wrapped rows in the grid. */
@@ -89,8 +88,8 @@ export class Glyphs {
 	readonly cols: number;
 
 	/**
-	 * Anchors keyed by group number (0-9). Each value is the list of
-	 * anchors in that group, in the order they appear in the text.
+	 * Anchors keyed by group number (0-9), each list in the order the
+	 * anchors appear in the text. Groups with no anchors are absent.
 	 */
 	readonly anchors: Record<number, Anchor[]>;
 
@@ -100,36 +99,37 @@ export class Glyphs {
 	/** Per source character: the cell it renders into, if any. */
 	private readonly source_to_cell: (Cell | undefined)[];
 
+	/** Per source character: the cell a cursor resting on it displays at. */
+	private readonly source_to_cursor: (Cell | undefined)[];
+
 	/** The source index of the last visible character, or -1 when empty. */
 	private last_source: number;
 
 	/**
-	 * Compile `text` into wrapped rows, glyph cells, and the position
-	 * map between them.
+	 * Compile `text` into a grid of wrapped rows, ready to blit.
 	 *
-	 * The text is laid out per {@link TextOptions}, then rendered into
-	 * packed 16-bit cells: colour escapes set the colours of the
-	 * characters that follow (clamped to the dark half, capitals
-	 * selecting the bright half), tabs advance to the next multiple of
-	 * {@link TAB_WIDTH} without emitting, and characters outside CP437
-	 * map through {@link charCodeInCp437}. A space on the all-black
-	 * colour byte is left as zero, which the shader clips; the default
-	 * colours are white-on-black.
+	 * Escape sequences are interpreted: colour escapes recolour the
+	 * characters that follow, `\\` draws one backslash, anchors are recorded
+	 * in {@link Glyphs.anchors}, and a tab advances to the next multiple of
+	 * {@link TAB_WIDTH}. Text starts white-on-black, and characters outside
+	 * CP437 draw blank.
 	 *
 	 * @example
 	 * ```ts
 	 * import { Glyphs, Wrap } from "@micahdb/tscon";
 	 *
 	 * const g = new Glyphs("long text", 4, { wrap: Wrap.HARD });
-	 * g.rows; // 2
+	 *
+	 * g.rows;          // 3: "long", " tex", "t"
+	 * g.wrappedText;   // ["long", " tex", "t"]
 	 * ```
 	 *
-	 * @param text  The text to compile, with escape sequences.
+	 * @param text  The text to compile, possibly with escape sequences.
 	 * @param cols  Width of the grid in cells. If `<= 0`, the grid is
 	 *              empty.
-	 * @param opts  Layout options: how over-long lines break, and
-	 *              whether escapes render raw. Defaults to word wrap
-	 *              with escapes live.
+	 * @param opts  Layout options: how over-long lines break, and whether
+	 *              escapes render raw. Defaults to word wrap with escapes
+	 *              live.
 	 */
 	constructor(text: string, cols: number, opts: TextOptions = {}) {
 		this.sourceText = text;
@@ -144,6 +144,7 @@ export class Glyphs {
 
 		this.visible_to_source = [];
 		this.source_to_cell = [];
+		this.source_to_cursor = [];
 		this.last_source = -1;
 
 		this.build(layout, opts.raw === true);
@@ -175,7 +176,11 @@ export class Glyphs {
 				}
 
 				row_map[col] = source_index;
-				this.source_to_cell[source_index] = { row, col };
+
+				const cell = { row, col };
+
+				this.source_to_cell[source_index] = cell;
+				this.source_to_cursor[source_index] = cell;
 				this.last_source = source_index;
 
 				for (const anchor of pending) {
@@ -229,7 +234,9 @@ export class Glyphs {
 
 				const c = piece[i]!;
 
-				// a tab advances to the next tab stop without emitting
+				// a tab advances to the next tab stop without emitting,
+				// but the blank run it advances across belongs to it, so a
+				// cursor resting on it sits at the run's first column
 				if (c === "\t") {
 					const tab_cols = Math.min(
 						TAB_WIDTH - (col % TAB_WIDTH),
@@ -240,6 +247,7 @@ export class Glyphs {
 						row_map[tabbed] = source_index;
 					}
 
+					this.source_to_cursor[source_index] = { row, col };
 					col += tab_cols;
 					i++;
 					continue;
@@ -263,20 +271,23 @@ export class Glyphs {
 	}
 
 	/**
-	 * The cell that the source character at `index` renders into, or
-	 * `null` when it renders nowhere.
+	 * The cell that the source character at `index` draws in, or `null`
+	 * when it draws nowhere.
 	 *
-	 * A character renders nowhere when it is inside an escape sequence,
-	 * a newline or line continuation, a tab (which advances the column
-	 * but emits nothing), a blank consumed by word wrapping, or past
-	 * the end of the text.
+	 * A character draws nowhere when it belongs to an escape sequence, is a
+	 * newline or line continuation, is a tab, is a blank that wrapping
+	 * removed, or lies past the end of the text. Ask where a character
+	 * appears on screen with this; ask where a cursor sits with
+	 * {@link Glyphs.cursorCell}, which never answers "nowhere".
 	 *
 	 * @example
 	 * ```ts
+	 * import { Glyphs } from "@micahdb/tscon";
+	 *
 	 * const g = new Glyphs("ab", 10);
 	 *
-	 * g.renderedCell(1); // { row: 0, col: 1 }
-	 * g.renderedCell(2); // null: past the end
+	 * g.renderedCell(1);   // { row: 0, col: 1 }: the "b"
+	 * g.renderedCell(2);   // null: past the end of the text
 	 * ```
 	 *
 	 * @param index  Source character index. Out-of-range indices return
@@ -290,23 +301,36 @@ export class Glyphs {
 	}
 
 	/**
-	 * Where a text cursor resting at source index `index` displays: the
-	 * cell of the next visible character, or the end of the last row
-	 * when no visible character follows.
+	 * The cell a text cursor resting at source index `index` sits in.
 	 *
-	 * Escape characters, newlines, tabs, and wrap-consumed blanks have
-	 * no cell of their own; a cursor on any of them snaps forward to
-	 * the next glyph. This is the query for rendering cursors,
-	 * selection endpoints, viewport follow, and anchor placement: on a
-	 * zero-width escape it returns exactly the cell that escape's
-	 * anchor captured.
+	 * A character with no cell of its own displays on the next character
+	 * that has one, and past the last one at the end of the last row. A tab
+	 * is the exception: it displays at the first column of the blank run it
+	 * advances across, so moving across a run of tabs steps through that run
+	 * instead of sticking to the character that follows it.
+	 *
+	 * Use this wherever a cursor, a selection endpoint, or a highlight
+	 * belongs: on an escape it lands on the character after it, exactly
+	 * where the escape's anchor points.
 	 *
 	 * @example
 	 * ```ts
+	 * import { Glyphs } from "@micahdb/tscon";
+	 *
 	 * const g = new Glyphs("ab\\f1c", 10);
 	 *
-	 * g.cursorCell(2); // { row: 0, col: 2 }: the escape snaps to "c"
-	 * g.cursorCell(9); // { row: 0, col: 3 }: past the end clamps
+	 * g.cursorCell(2);   // { row: 0, col: 2 }: the escape shows on the "c"
+	 * g.cursorCell(9);   // { row: 0, col: 3 }: past the end clamps
+	 * ```
+	 *
+	 * @example
+	 * ```ts
+	 * import { Glyphs } from "@micahdb/tscon";
+	 *
+	 * const g = new Glyphs("a\tb", 20);
+	 *
+	 * g.cursorCell(1);   // { row: 0, col: 1 }: the tab's blank run starts here
+	 * g.cursorCell(2);   // { row: 0, col: 8 }: the "b" after the tab stop
 	 * ```
 	 *
 	 * @param index  Source character index. Negative indices snap to
@@ -319,14 +343,14 @@ export class Glyphs {
 			return { row: 0, col: 0 };
 		}
 
-		const visible = this.source_to_cell[index];
+		const visible = this.source_to_cursor[index];
 
 		if (visible !== undefined) {
 			return { ...visible };
 		}
 
-		for (let i = Math.max(0, index); i < this.source_to_cell.length; i++) {
-			const forward = this.source_to_cell[i];
+		for (let i = Math.max(0, index); i < this.source_to_cursor.length; i++) {
+			const forward = this.source_to_cursor[i];
 
 			if (forward !== undefined) {
 				return { ...forward };
@@ -338,21 +362,36 @@ export class Glyphs {
 	}
 
 	/**
-	 * The source character index that a click on cell `(row, col)`
-	 * targets, clamped the way a text cursor clamps.
+	 * The source character index a click on cell `(row, col)` targets,
+	 * clamped the way a text cursor clamps.
 	 *
-	 * A column past the row's end lands on its last character, a
-	 * column before zero lands on its first, a row with no visible
-	 * characters continues to the next row's first character, and a
-	 * position off the region lands on the last visible character in
-	 * it.
+	 * A column past a row's end lands on its last character and one before
+	 * the start on its first; a row with nothing on it continues to the next
+	 * row's first character; a position off the grid lands on the last
+	 * character in it.
+	 *
+	 * This is the reverse of {@link Glyphs.cursorCell}: hand it the cell the
+	 * pointer is over and get back the source index to place a cursor at.
 	 *
 	 * @example
 	 * ```ts
+	 * import { Glyphs } from "@micahdb/tscon";
+	 *
 	 * const g = new Glyphs("ab", 10);
 	 *
-	 * g.cursorIndex(0, 0);  // 0
-	 * g.cursorIndex(0, 9);  // 1: past the end clamps to the last character
+	 * g.cursorIndex(0, 0);   // 0: the "a"
+	 * g.cursorIndex(0, 9);   // 1: past the end clamps to the last character
+	 * ```
+	 *
+	 * @example
+	 * ```ts
+	 * import { Glyphs } from "@micahdb/tscon";
+	 *
+	 * // a click anywhere in a tab's blank run lands on that tab
+	 * const g = new Glyphs("a\tb", 20);
+	 *
+	 * g.cursorIndex(0, 4);   // 1: inside the tab's run
+	 * g.cursorIndex(0, 8);   // 2: the "b" after the tab stop
 	 * ```
 	 *
 	 * @param row  The wrapped row within the grid.
@@ -380,18 +419,22 @@ export class Glyphs {
 	}
 
 	/**
-	 * The number of visible columns a wrapped row occupies, tabs
-	 * expanded.
+	 * The number of columns a wrapped row fills, tabs expanded.
 	 *
-	 * Short of `cols` whenever the row broke early; the row's full
-	 * display width otherwise. Off-grid rows report `0`.
+	 * Short of `cols` whenever the row ended early, and its full display
+	 * width otherwise. Rows outside the grid report `0`.
+	 *
+	 * Use this to paint a row to its end rather than to the grid edge: a
+	 * highlight's last row, an underline, a background bar.
 	 *
 	 * @example
 	 * ```ts
-	 * const g = new Glyphs("ab\tc", 10);
+	 * import { Glyphs } from "@micahdb/tscon";
 	 *
-	 * g.rowCols(0); // 9: "ab" then the tab to column 8, then "c"
-	 * g.rowCols(1); // 0
+	 * const g = new Glyphs("ab\tc", 20);
+	 *
+	 * g.rowCols(0);   // 9: "ab", a tab to column 8, then "c"
+	 * g.rowCols(1);   // 0: outside the grid
 	 * ```
 	 *
 	 * @param row  The wrapped row within the grid.
@@ -402,21 +445,35 @@ export class Glyphs {
 	}
 
 	/**
-	 * A source range as per-row runs of cells, for highlights,
-	 * selections, and underlines.
+	 * The cells a source range covers, as runs of columns per row.
 	 *
-	 * The half-open range `[start, end)` is resolved to the cells its
-	 * visible characters occupy: one {@link CellSpan} per wrapped row,
-	 * ordered by row, with runs merged across the zero-width escapes
-	 * and tabs inside the range. A range that renders nowhere produces
-	 * no spans.
+	 * The half-open range `[start, end)` becomes one {@link CellSpan} per
+	 * wrapped row it touches, ordered by row. Escapes and tabs inside the
+	 * range do not split a run, and a range that draws nothing returns no
+	 * spans.
+	 *
+	 * This is the shape highlights want: a search match, a selection, a
+	 * syntax span, an underline -- one span to shade per row, even when the
+	 * range wraps.
 	 *
 	 * @example
 	 * ```ts
+	 * import { Glyphs } from "@micahdb/tscon";
+	 *
 	 * const g = new Glyphs("aaaa bbbb", 5);
 	 *
 	 * g.spansFor(2, 6);
 	 * // [{ row: 0, from: 2, to: 4 }, { row: 1, from: 0, to: 1 }]
+	 * ```
+	 *
+	 * @example
+	 * ```ts
+	 * import { Glyphs } from "@micahdb/tscon";
+	 *
+	 * // escapes inside the range do not split the run
+	 * const g = new Glyphs("aa\\f1bb", 20);
+	 *
+	 * g.spansFor(0, 6);   // [{ row: 0, from: 0, to: 3 }]
 	 * ```
 	 *
 	 * @param start  First source character index of the range.
@@ -451,29 +508,55 @@ export class Glyphs {
 	}
 
 	/**
-	 * A copy of the grid with every cell -- optionally only those
-	 * within `within` -- replaced by `fn`'s return value.
+	 * A copy of the grid with some or all cells replaced.
 	 *
-	 * Cells never move, so the copy's source text, position mapping,
-	 * and anchors all remain exactly valid: it answers every query
-	 * identically to the original. This is the way to derive overlay
-	 * state (cursor inversion, selection shading, dimming) without
-	 * mutating a compiled grid.
+	 * `fn` is called with each cell's current value and its position, and
+	 * returns the value to draw instead. Only cells inside `within` are
+	 * visited; omit it to map every cell. The original grid is left alone,
+	 * so a compiled grid can be shared and derived from freely.
+	 *
+	 * Because cells keep their positions, the copy answers every position
+	 * query exactly as the original does: use it to draw overlay state --
+	 * a cursor inversion, a selection shade, a dimmed region, a cleared
+	 * area -- without disturbing the grid you compiled.
 	 *
 	 * @example
 	 * ```ts
-	 * const g = new Glyphs("ab", 2);
+	 * import { Glyphs } from "@micahdb/tscon";
 	 *
-	 * // invert the first cell's colours
-	 * const inverted = g.mapCells((cell, row, col) =>
-	 *     row === 0 && col === 0 ? cell ^ 0xf000 : cell);
+	 * const g = new Glyphs("hello world", 11);
+	 *
+	 * // blank the first three cells, so whatever is beneath shows through
+	 * const cleared = g.mapCells(
+	 *     () => 0,
+	 *     { row: 0, col: 0, rows: 1, cols: 3 },
+	 * );
+	 *
+	 * cleared.data[0];   // 0
+	 * g.data[0];         // unchanged
 	 * ```
 	 *
-	 * @param fn      Receives each cell's packed value and position;
-	 *                returns the replacement value.
-	 * @param within  Optional rect limiting which cells are mapped.
-	 *                Clamped to the grid; omit to map every cell.
-	 * @returns       The transformed copy.
+	 * @example
+	 * ```ts
+	 * import { Glyphs } from "@micahdb/tscon";
+	 *
+	 * // draw one grid's cells over another's where they are not blank
+	 * const base = new Glyphs("base text", 9);
+	 * const over = new Glyphs("XXXXX", 9);
+	 *
+	 * const merged = base.mapCells((cell, row, col) => {
+	 *     const overlay = over.data[row * over.cols + col];
+	 *
+	 *     return overlay === 0 ? cell : overlay;
+	 * });
+	 * ```
+	 *
+	 * @param fn      Receives each cell's value and position; returns the
+	 *                value to use instead.
+	 * @param within  Optional rect limiting which cells are mapped. Clamped
+	 *                to the grid; omit to map every cell.
+	 * @returns       The transformed copy, with the original's text,
+	 *                positions, and anchors.
 	 */
 	mapCells(fn: (cell: number, row: number, col: number) => number, within?: Rect): Glyphs {
 		const data = this.data.slice();

@@ -1,15 +1,16 @@
 /**
- * A single cell position in a glyph grid or terminal: row and column.
+ * A position in a cell grid: a row and a column.
  *
- * Rows and columns are integer cell indices, counted top-to-bottom and
- * left-to-right. This is the coordinate system {@link Rect} positions:
- * a `Rect` is placed by the `Cell` at its top-left corner.
+ * Rows are counted from the top and columns from the left, in whole cells.
+ * This is the coordinate system everything in tscon is expressed in: the
+ * top-left cell of a {@link Rect} is a `Cell`, and the positions
+ * {@link Glyphs} reports are `Cell`s.
  *
  * @example
  * ```ts
  * import type { Cell } from "@micahdb/tscon";
  *
- * const at: Cell = { row: 3, col: 7 };
+ * const at: Cell = { row: 3, col: 7 };   // row 3, column 7
  * ```
  */
 export type Cell = {
@@ -20,8 +21,11 @@ export type Cell = {
 };
 
 /**
- * A horizontal run of cells on one row: columns `from` (inclusive) to
- * `to` (exclusive).
+ * A horizontal run of cells on one row, from column `from` (inclusive) to
+ * column `to` (exclusive).
+ *
+ * This is the shape {@link Glyphs.spansFor} returns: a source range that
+ * crosses a wrapped row break comes back as one span per row.
  *
  * @example
  * ```ts

@@ -1,27 +1,27 @@
 /**
- * How each cell of a {@link TexGlyphs} grid samples its source texture.
+ * How a texture is drawn as cells, chosen per grid by
+ * {@link textureGlyphs} and drawn by {@link Renderer.draw}.
  *
- * The value is packed into each texture-glyph and read by the renderer's
- * vertex shader to decide, per cell, how to turn the source texture into a
- * drawn glyph.
+ * - `SAMPLE`    -- draw the texture as it is, so the region looks like the
+ *                  texture. This is the photographic mode.
+ * - `GLYPHS`    -- draw the texture as coloured characters on a black
+ *                  background. Softer and less busy than `BG_GLYPHS`, and
+ *                  the safe choice when text is drawn over the region.
+ * - `BG_GLYPHS` -- like `GLYPHS`, but the character backgrounds carry
+ *                  colour too. Brighter and more faithful; use it when
+ *                  nothing is drawn on top of the region.
+ * - `MIX`       -- alternate `SAMPLE` and `GLYPHS` cell by cell, in a
+ *                  checkerboard.
+ * - `ROWS`      -- alternate `SAMPLE` and `GLYPHS` row by row.
+ * - `COLS`      -- alternate `SAMPLE` and `GLYPHS` column by column.
  *
- * - `SAMPLE`    -- render the source texture directly. Each cell is given UV
- *                  coordinates into the texture, so the full rendered region
- *                  simply shows the source texture as-is.
- * - `GLYPHS`    -- sample the texture and convert it to a glyph: the
- *                  character is chosen by the sample's brightness and the
- *                  colour by dithering (Bayer matrix + nearest palette hue).
- *                  The background stays black. Preferred when you want the
- *                  texture rendered as coloured characters without it being
- *                  too bright or jarring.
- * - `BG_GLYPHS` -- like `GLYPHS`, but also sets the background colour, so
- *                  the full glyph (foreground + background) carries more of
- *                  the sample's colour. This is noticeably brighter and more
- *                  visually accurate; use it when no text is drawn on top of
- *                  the rendered texture.
- * - `MIX`       -- alternate `SAMPLE`/`GLYPHS` in a checkerboard pattern.
- * - `ROWS`      -- alternate `SAMPLE`/`GLYPHS` by row.
- * - `COLS`      -- alternate `SAMPLE`/`GLYPHS` by column.
+ * @example
+ * ```ts
+ * import { TexGlyphMode, textureGlyphs } from "@micahdb/tscon";
+ *
+ * // a 24x48 region drawn as bright coloured characters
+ * const tg = textureGlyphs(24, 48, TexGlyphMode.BG_GLYPHS);
+ * ```
  */
 export enum TexGlyphMode {
 	SAMPLE = 0,
@@ -33,16 +33,26 @@ export enum TexGlyphMode {
 }
 
 /**
- * A grid of texture-sampling descriptors produced by {@link textureGlyphs}
- * and consumed by {@link Renderer.draw}.
+ * A description of how to draw a texture as cells: one entry per cell saying
+ * which part of the texture it shows and how, built by
+ * {@link textureGlyphs} and drawn by {@link Renderer.draw}.
  *
- * Each cell is a 32-bit value packing the cell's row, its {@link TexGlyphMode},
- * and its column: `[ row (8) | mode (8) | col (16) ]`.
+ * The grid must be the same size as the region it is drawn into, so size it
+ * to the area the texture should fill.
  *
- * `data` is laid out row-major with `rows * cols` entries.
+ * @example
+ * ```ts
+ * import { TexGlyphMode, textureGlyphs } from "@micahdb/tscon";
+ * import type { TexGlyphs } from "@micahdb/tscon";
+ *
+ * const tg: TexGlyphs = textureGlyphs(24, 48, TexGlyphMode.SAMPLE);
+ *
+ * tg.rows;   // 24
+ * tg.cols;   // 48
+ * ```
  */
 export type TexGlyphs = {
-	/** Packed texture-glyph data, length `rows * cols`, row-major. */
+	/** One entry per cell, row-major, `rows * cols` in all. */
 	data: Uint32Array;
 	/** Number of rows in the grid. */
 	rows: number;
@@ -69,31 +79,31 @@ function cellMode(mode: TexGlyphMode, row: number, col: number): TexGlyphMode {
 }
 
 /**
- * Build a {@link TexGlyphs} grid of `rows` by `cols` cells that samples a
+ * Build a {@link TexGlyphs} grid of `rows` by `cols` cells that draws a
  * texture in the given {@link TexGlyphMode}.
  *
- * The grid is sized to match a region of the terminal (typically the whole
- * canvas, `canvas.rows` x `canvas.cols`, or a smaller sub-region) and is
- * passed to {@link Renderer.draw} along with the texture to display.
+ * Size the grid to the region you want the texture to fill -- the whole
+ * canvas, or part of it -- and pass it to {@link Renderer.draw} with the
+ * texture. A grid only fits a region of exactly the same size.
  *
- * For the `MIX`, `ROWS`, and `COLS` modes the requested `mode` is used as a
- * base and individual cells are switched between `SAMPLE` and `GLYPHS`
- * according to the pattern (see {@link TexGlyphMode} for what each mode does
- * to the sampled texture). The packed per-cell value encodes the cell's own
- * row/column and the (possibly per-cell) effective mode.
+ * The `MIX`, `ROWS`, and `COLS` modes pick between `SAMPLE` and `GLYPHS` per
+ * cell, following their pattern.
  *
  * @example
  * ```ts
  * import { TexGlyphMode, textureGlyphs } from "@micahdb/tscon";
  *
- * // whole-canvas glyphs that sample the texture as coloured characters
- * const tg = textureGlyphs(canvas.rows, canvas.cols, TexGlyphMode.GLYPHS);
+ * // the whole canvas, texture shown as coloured characters
+ * const full = textureGlyphs(canvas.rows, canvas.cols, TexGlyphMode.GLYPHS);
+ *
+ * // a 24x48 inset, texture shown as it is
+ * const inset = textureGlyphs(24, 48, TexGlyphMode.SAMPLE);
  * ```
  *
  * @param rows  Height of the grid in cells.
  * @param cols  Width of the grid in cells.
- * @param mode  Sampling mode to apply to the cells.
- * @returns     The packed texture-glyph grid.
+ * @param mode  How the texture is drawn in each cell.
+ * @returns     The grid, ready for {@link Renderer.draw}.
  */
 export function textureGlyphs(
 	rows: number,

@@ -23,10 +23,22 @@ export enum Wrap {
 }
 
 /**
- * Number of columns a tab advances the cursor by.
+ * The column width a tab advances to, in cells.
  *
- * Tabs in text processed by {@link textToLines} and {@link Glyphs}
- * advance the column position to the next multiple of this width.
+ * A tab in tscon text moves the next character to the next multiple of this
+ * width, so tabs line up in columns regardless of what precedes them. Apply
+ * the same width when you build equivalent text outside tscon, such as an
+ * HTML fallback.
+ *
+ * @example
+ * ```ts
+ * import { TAB_WIDTH, Glyphs } from "@micahdb/tscon";
+ *
+ * // "a" at column 0, a tab stop at column 8, "b" at column 8
+ * const g = new Glyphs("a\tb", 80);
+ *
+ * g.cursorCell(2);      // { row: 0, col: TAB_WIDTH }
+ * ```
  */
 export const TAB_WIDTH = 8;
 
@@ -56,56 +68,18 @@ export type TextOptions = {
 	raw?: boolean;
 };
 
-/**
- * The result of laying text out: one string per wrapped row, plus the
- * mapping back to the source text.
- *
- * Each piece is a verbatim slice of the continuation-stripped text
- * (escape sequences included, trailing blanks trimmed only where
- * wrapping consumed them), so `pieces[r][i]` is the stripped character
- * at `starts[r] + i`, and `source[stripped_index]` is its index in the
- * original text.
- *
- * @example
- * ```ts
- * import { layoutText } from "@micahdb/tscon";
- *
- * layoutText("hello world", 5);
- * // { pieces: ["hello", "world"], starts: [0, 6], source: [0, 1, ...] }
- * ```
- */
+// the laid-out rows and where each begins, for Glyphs to compile from
 export type TextLayout = {
 	/** The laid-out visible rows, escapes preserved. */
 	pieces: string[];
-	/** Index of each piece's first character in the stripped text. */
+	/** Index of each piece's first character in the joined text. */
 	starts: number[];
-	/** Original source index of every character of the stripped text. */
+	/** Original source index of each remaining source character. */
 	source: number[];
 };
 
-/**
- * Lay `text` out into rows no wider than `cols` columns, tracking where
- * each row begins in the source.
- *
- * This is the full-layout pass the {@link Glyphs} class compiles from.
- * Line continuations join first; escape sequences are interpreted by
- * {@link scanEscapeAt} and take no columns (unless `raw` is set).
- *
- * @example
- * ```ts
- * import { layoutText } from "@micahdb/tscon";
- *
- * layoutText("hello world", 5);
- * // { pieces: ["hello", "world"], starts: [0, 6] }
- * ```
- *
- * @param text  The text to lay out, possibly with escape sequences.
- * @param cols  Maximum number of visible columns per row. If `<= 0`, no
- *              rows are produced.
- * @param opts  Layout options: how over-long lines break, and whether
- *              escapes render raw. Defaults to word wrap, escapes live.
- * @returns     The pieces and their source offsets.
- */
+// the layout pass textToLines and Glyphs share: rows, plus where each one
+// begins in the source so positions can be tracked
 export function layoutText(
 	text: string,
 	cols: number,
@@ -134,29 +108,26 @@ export function layoutText(
 }
 
 /**
- * Lay `text` out into lines no wider than `cols` columns.
+ * Lay `text` out into lines no wider than `cols` columns, without
+ * rendering it.
  *
- * This is the line-breaking pass used by the {@link Glyphs} class: it
- * interprets the tscon text escape sequences so they take no columns
- * (unless `raw` is set) and returns the visible content of each line as
- * a string, escapes preserved for later processing.
+ * Escapes take no columns (unless `raw` is set), so wrapping counts only the
+ * characters a reader sees. Newlines always end a line, and a lone
+ * backslash immediately before a newline joins the two lines. Tabs advance
+ * to the next multiple of {@link TAB_WIDTH}. Lines longer than `cols` are
+ * handled per {@link TextOptions.wrap}.
  *
- * Newlines always break the line. A lone backslash immediately followed
- * by a newline is a line continuation: both characters are removed and
- * the following content joins the current line. Tabs advance to the
- * next multiple of {@link TAB_WIDTH}.
- *
- * With `wrap` of `Wrap.WORD`, lines longer than `cols` break at the
- * most recent space (or mid-word when a single word fills a whole
- * line). `Wrap.TRUNCATE` discards the rest of the line instead, and
- * `Wrap.HARD` breaks at exactly `cols` visible characters regardless of
- * word boundaries.
+ * Each returned line still contains its escape sequences, so it can be
+ * passed back into tscon or rendered later. Use {@link Glyphs} when you want
+ * cells rather than strings.
  *
  * @example
  * ```ts
- * import { textToLines } from "@micahdb/tscon";
+ * import { textToLines, Wrap } from "@micahdb/tscon";
  *
- * textToLines("hello world", 5);   // ["hello", "world"]
+ * textToLines("hello world", 5);                       // ["hello", "world"]
+ * textToLines("hello world", 5, { wrap: Wrap.TRUNCATE }); // ["hello"]
+ * textToLines("a\tb", 80);                             // ["a\tb"]
  * ```
  *
  * @param text  The text to lay out, possibly with escape sequences.
@@ -164,7 +135,7 @@ export function layoutText(
  *              empty array is returned.
  * @param opts  Layout options: how over-long lines break, and whether
  *              escapes render raw. Defaults to word wrap, escapes live.
- * @returns     The laid-out visible lines, with escape sequences preserved.
+ * @returns     One string per visible line, escapes preserved.
  */
 export function textToLines(
 	text: string,

@@ -173,11 +173,12 @@ describe("Glyphs positions", () => {
 		expect(glyphs.cursorCell(-3)).toEqual({ row: 0, col: 0 });
 	});
 
-	test("tabs render nowhere but cursor to their tab stop", () => {
+	test("tabs render nowhere; a cursor on one sits at its blank run's start", () => {
 		const glyphs = new Glyphs("a\tb", 80);
 
 		expect(glyphs.renderedCell(1)).toBeNull();
-		expect(glyphs.cursorCell(1)).toEqual({ row: 0, col: 8 });
+		expect(glyphs.cursorCell(1)).toEqual({ row: 0, col: 1 });
+		expect(glyphs.cursorCell(2)).toEqual({ row: 0, col: 8 });
 
 		// clicks anywhere in the tab's span land on the tab; "a" and "b"
 		// stay themselves
@@ -186,6 +187,29 @@ describe("Glyphs positions", () => {
 		expect(glyphs.cursorIndex(0, 7)).toBe(1);
 		expect(glyphs.cursorIndex(0, 8)).toBe(2);
 		expect(glyphs.rowCols(0)).toBe(9);
+	});
+
+	test("a run of tabs steps the cursor across its blank columns", () => {
+		const glyphs = new Glyphs("\t\tx", 80);
+
+		// each tab owns its own run, so the cursor advances tab by tab
+		expect(glyphs.cursorCell(0)).toEqual({ row: 0, col: 0 });
+		expect(glyphs.cursorCell(1)).toEqual({ row: 0, col: 8 });
+		expect(glyphs.cursorCell(2)).toEqual({ row: 0, col: 16 });
+
+		// neither tab renders a cell, and clicks anywhere in a run find it
+		expect(glyphs.renderedCell(0)).toBeNull();
+		expect(glyphs.renderedCell(1)).toBeNull();
+		expect(glyphs.cursorIndex(0, 3)).toBe(0);
+		expect(glyphs.cursorIndex(0, 12)).toBe(1);
+	});
+
+	test("an escape before a tab displays at the tab's run", () => {
+		const glyphs = new Glyphs(`${B}f1\tx`, 80);
+
+		expect(glyphs.cursorCell(0)).toEqual({ row: 0, col: 0 });
+		expect(glyphs.cursorCell(3)).toEqual({ row: 0, col: 0 });
+		expect(glyphs.cursorCell(4)).toEqual({ row: 0, col: 8 });
 	});
 
 	test("wrapped rows map positions row by row", () => {

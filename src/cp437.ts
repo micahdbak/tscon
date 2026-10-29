@@ -18,8 +18,8 @@
  *
  * Index 0 is a blank (the CP437 NUL is unused) and index 255 is also treated
  * as blank; all other indices 1..254 map to the corresponding CP437 glyph.
- * This is the character set tscon's bitmap font covers and that
- * {@link textGlyphs} encodes glyphs in.
+ * This is the character set tscon's font covers: text compiled by
+ * {@link Glyphs} draws these glyphs, and anything else draws blank.
  *
  * NOTE: chars at 0 and 255 are ignored.
  */
@@ -59,8 +59,8 @@ for (let i = 1; i < 255; i++) {
  *
  * Characters in {@link CP437_CHARS} are mapped to their index (1..254); any
  * code point above the maximum one present in CP437 (or otherwise absent)
- * returns `0` (blank). This is used internally by {@link textGlyphs} when
- * encoding characters into glyphs.
+ * returns `0` (blank). {@link Glyphs} uses this to decide which characters
+ * the font can draw.
  *
  * @param code_point  The Unicode code point to look up.
  * @returns           The CP437 index (1..254), or `0` if not representable.

@@ -1,14 +1,26 @@
 const DIGIT = /\d/;
 
 /**
- * One escape sequence found while walking tscon text: what it is, and how
- * many source characters it occupies.
+ * What {@link scanEscapeAt} found at a position in tscon text, and how many
+ * source characters it spans.
  *
- * Escapes occupy visible space only through the `text` kind: a lone
- * backslash displays one backslash, and `\\` collapses to one. Anchors
- * (`\aX` / `\aX{options}`) and colours (`\fX` / `\FX` / `\bX` / `\BX`)
- * take no columns at all -- anchors record a position and colours change
- * the current colour state.
+ * - `text` -- a character that displays. `chars` is `1`, or `2` for `\\`,
+ *   which displays as a single backslash.
+ * - `anchor` -- `\aX` or `\aX{options}`, taking no columns. `group` is the
+ *   anchor's group (0-9) and `options` its payload, or `null` when the
+ *   braces are absent or empty.
+ * - `colour` -- `\fX` / `\FX` / `\bX` / `\BX`, taking no columns.
+ *   `attribute` is the channel it sets (`"fg"` or `"bg"`), `bright` whether
+ *   it selects the bright half of the palette, and `num` the palette index.
+ *
+ * @example
+ * ```ts
+ * import { scanEscapeAt } from "@micahdb/tscon";
+ * import type { EscapeScan } from "@micahdb/tscon";
+ *
+ * const scan: EscapeScan = scanEscapeAt("\\a0{Foo|bar}Foo", 0);
+ * // { kind: "anchor", chars: 12, group: 0, options: "Foo|bar" }
+ * ```
  */
 export type EscapeScan =
 	| { kind: "text"; chars: number }
