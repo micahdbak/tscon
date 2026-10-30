@@ -73,14 +73,54 @@ export function charCodeInCp437(code_point: number): number {
 	return CP437_MAP[code_point];
 }
 
+// the box-drawing glyphs always come from the built-in bitmap font, so the
+// atlas draws a stand-in in their cells rather than a second copy
+const BOX_DRAWING = "░▒▓│┤╡╢╖╕╣║╗╝╜╛┐└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀";
+const STAND_IN = "@";
+
+const ATLAS_CHARS = CP437_CHARS.replace(
+	BOX_DRAWING,
+	STAND_IN.repeat(BOX_DRAWING.length)
+);
+
+// the grid the shaders sample the atlas with; changing either breaks them
+const ATLAS_COLS = 32;
+const ATLAS_ROWS = 8;
+
+// one glyph's ink box, measured against its pen position and baseline
+interface GlyphBox {
+	readonly glyph: string;
+	readonly left: number;
+	readonly right: number;
+	readonly ascent: number;
+	readonly descent: number;
+}
+
+// whether the ink lands inside the cell when the glyph is drawn at the pen
+function fitsCell(box: GlyphBox, width: number, above: number, below: number): boolean {
+	return -box.left >= 0 && box.right <= width && box.ascent <= above && box.descent <= below;
+}
+
 /**
  * Render the CP437 character set onto a 2D canvas for use as a font texture.
  *
- * Loads the given `font` CSS string via the Font Loading API, measures an
- * `"A"` glyph to determine per-cell dimensions, then paints all 255 CP437
- * glyphs into a 32-column x 8-row grid on the supplied `canvas` (white on
- * black). Box-drawing characters are replaced with `"@"` placeholders so
- * they are not double-drawn; tscon's built-in bitmap font is used for those.
+ * Loads the given `font` CSS string via the Font Loading API, then paints all
+ * 255 CP437 glyphs into a 32-column x 8-row grid on the supplied `canvas`
+ * (white on black). Box-drawing characters are replaced with `"@"`
+ * placeholders so they are not double-drawn; tscon's built-in bitmap font is
+ * used for those.
+ *
+ * Cells are as wide as the `font`'s advance and at least twice as tall, but
+ * grow taller when the glyphs paint outside that box, and the ink is centred
+ * in the cell. Characters the `font` does not cover are painted by a fallback
+ * font, whose ink can reach wider, higher, or lower than the `font`'s own
+ * metrics: a glyph that would not land inside its cell is scaled down and
+ * recentred until it does, so the atlas holds every glyph whole rather than
+ * cropping any of them.
+ *
+ * The grid is always 32 columns by 8 rows, whichever fonts end up painting it;
+ * only the cell size varies. Expect the atlas' pixel dimensions to differ
+ * between platforms when a fallback font is involved.
  *
  * The resulting canvas is intended to be captured (e.g. via `toDataURL` or a
  * WebGL texture upload) to produce an application-provided font texture that
@@ -104,53 +144,72 @@ export async function renderCp437(canvas: HTMLCanvasElement, font: string) {
 
 	ctx.font = font;
 
-	const metrics = ctx.measureText("A");
 	const padding = 1; // px
-	const glyph_width = metrics.width + 2 * padding;
-	const glyph_height = 2 * metrics.width + 2 * padding;
-	const ascent: number = Math.ceil(metrics.fontBoundingBoxAscent);
+	const inner_width = Math.ceil(ctx.measureText("A").width);
+	const boxes: GlyphBox[] = [];
 
-	const cols = 32;
-	const rows = 8;
+	// the cell is sized from the ink the glyphs actually paint, since a fallback
+	// font for an uncovered character can reach well outside the font's metrics
+	for (let i = 1; i < 255; i++) {
+		const glyph = ATLAS_CHARS.slice(i, i + 1);
+		const measured = ctx.measureText(glyph);
 
-	canvas.width = glyph_width * cols;
-	canvas.height = glyph_height * rows;
+		boxes.push({
+			glyph,
+			left: measured.actualBoundingBoxLeft,
+			right: measured.actualBoundingBoxRight,
+			ascent: measured.actualBoundingBoxAscent,
+			descent: measured.actualBoundingBoxDescent,
+		});
+	}
 
-	// fill canvas with black first
+	const ascent = Math.ceil(Math.max(...boxes.map((box) => box.ascent)));
+	const descent = Math.ceil(Math.max(...boxes.map((box) => box.descent)));
+
+	// cells keep the 8x16 shape of the terminal's cells unless the ink needs more
+	const inner_height = Math.max(ascent + descent, 2 * inner_width);
+	const glyph_width = inner_width + 2 * padding;
+	const glyph_height = inner_height + 2 * padding;
+
+	// centring the ink box in the cell leaves the padding and the neighbouring
+	// cells untouched whatever the glyphs' metrics turn out to be
+	const baseline = padding + (inner_height - (ascent + descent)) / 2 + ascent;
+	const above = baseline - padding;
+	const below = inner_height - above;
+
+	canvas.width = glyph_width * ATLAS_COLS;
+	canvas.height = glyph_height * ATLAS_ROWS;
+
+	// resizing the canvas resets the context, so state is set after it
+	ctx.font = font;
 	ctx.fillStyle = "black";
 	ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-	// reset these
-	ctx.font = font;
 	ctx.fillStyle = "white";
 
-	// don't want to draw box drawing characters;
-	// the moderndos font will be used for these
-	const box_drawing = "░▒▓│┤╡╢╖╕╣║╗╝╜╛┐└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀";
-	const chars = CP437_CHARS.replace(
-		box_drawing,
-		"@".repeat(box_drawing.length),
-	);
-
-	// render all glyphs
-	for (let i = 1; i < 255; i++) {
-		const x = (i % cols) * glyph_width;
-		const y = Math.floor(i / cols) * glyph_height;
+	for (const [i, box] of boxes.entries()) {
+		const code = i + 1;
+		const x = (code % ATLAS_COLS) * glyph_width;
+		const y = Math.floor(code / ATLAS_COLS) * glyph_height;
+		const ink_width = box.left + box.right;
+		const ink_height = box.ascent + box.descent;
 
 		ctx.save();
 		ctx.beginPath();
-		ctx.rect(
-			x + padding,
-			y + padding,
-			glyph_width - 2 * padding,
-			glyph_height - 2 * padding,
-		);
+		ctx.rect(x, y, glyph_width, glyph_height);
 		ctx.clip();
-		ctx.fillText(
-			chars.slice(i, i + 1),
-			x + padding,
-			y + ascent + padding,
-		);
+
+		if (fitsCell(box, inner_width, above, below)) {
+			ctx.fillText(box.glyph, x + padding, y + baseline);
+		} else {
+			// a glyph that overhangs its cell is fitted to it and recentred
+			const scale = Math.min(1, inner_width / ink_width, inner_height / ink_height);
+			const offset = (inner_width - scale * ink_width) / 2 + scale * box.left;
+
+			ctx.translate(x + padding + offset, y + baseline);
+			ctx.scale(scale, scale);
+			ctx.fillText(box.glyph, 0, 0);
+		}
+
 		ctx.restore();
 	}
 }
