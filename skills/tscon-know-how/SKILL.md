@@ -169,8 +169,6 @@ size. Keep grids at or under 256 rows, which is also the canvas's row cap.
 - `MIX` / `ROWS` / `COLS`: alternate `SAMPLE` and `GLYPHS` per cell by
   checkerboard, row, or column.
 
-Hovering a `SAMPLE` cell inverts its colours; glyph-mode cells swap foreground
-and background.
 
 ### Canvas: grid, resize, input
 

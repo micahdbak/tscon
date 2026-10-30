@@ -66,8 +66,6 @@ in uint a_char_code;
 
 uniform int u_rows;
 uniform int u_cols;
-uniform int u_mouse_row;
-uniform int u_mouse_col;
 uniform vec3 u_palette[16];
 
 out vec2 v_cell_coord;
@@ -81,8 +79,6 @@ flat out uint f_char_code;
 void main() {
 	int row = gl_InstanceID / u_cols;
 	int col = gl_InstanceID % u_cols;
-	int is_cursor = int(u_mouse_row == row && u_mouse_col == col);
-	int not_is_cursor = int(is_cursor == 0);
 
 	if (a_colour == 0u && a_char_code == 0u) {
 		// clipped: don't cover any pixels below this glyph
@@ -94,8 +90,8 @@ void main() {
 	// 240 = 0b11110000
 	int colour = int(a_colour + uint(a_colour == 0u) * 240u);
 
-	int fg_idx = int(colour >> (not_is_cursor * 4) & 0xf);
-	int bg_idx = int(colour >> (is_cursor * 4) & 0xf);
+	int fg_idx = int((colour >> 4) & 0xf);
+	int bg_idx = int(colour & 0xf);
 
 	f_fg_colour = u_palette[fg_idx];
 	f_bg_colour = u_palette[bg_idx];
@@ -194,8 +190,6 @@ uniform int u_rows;
 uniform int u_cols;
 uniform int u_canvas_rows;
 uniform int u_canvas_cols;
-uniform int u_mouse_row;
-uniform int u_mouse_col;
 uniform vec3 u_palette[16];
 uniform sampler2D u_texture;
 
@@ -204,7 +198,6 @@ out vec2 v_tex_uv_coord; // sample mode
 out vec2 v_font_uv_coord;
 
 flat out uint f_mode;
-flat out int f_is_cursor;
 flat out vec3 f_fg_colour;
 flat out vec3 f_bg_colour;
 flat out ivec2 f_glyph_coord;
@@ -319,9 +312,6 @@ void main() {
 	int origin_row = int(a_row);
 	int origin_col = int(a_col);
 
-	f_is_cursor = int(origin_row + u_row == u_mouse_row &&
-			  origin_col + u_col == u_mouse_col);
-
 	/* A glyph is made up of two triangles, six vertices:
 	 *
 	 *   0--2     ,5     0--2,5
@@ -390,11 +380,6 @@ void main() {
 		glyph = getGlyph(dim, lum);
 	}
 
-	if (glyph.fg_idx == glyph.bg_idx && f_is_cursor == 1) {
-		glyph.fg_idx = 15;
-		glyph.bg_idx = 0;
-	}
-
 	f_fg_colour = u_palette[glyph.fg_idx];
 	f_bg_colour = u_palette[glyph.bg_idx];
 
@@ -426,7 +411,6 @@ in vec2 v_tex_uv_coord; // f_mode == 0
 in vec2 v_font_uv_coord;
 
 flat in uint f_mode;
-flat in int f_is_cursor;
 flat in vec3 f_fg_colour;
 flat in vec3 f_bg_colour;
 flat in ivec2 f_glyph_coord;
@@ -442,24 +426,11 @@ out vec4 frag_colour;
 void main() {
 	if (f_mode == SAMPLE_MODE) {
 		frag_colour = texture(u_texture, v_tex_uv_coord);
-
-		// invert the sample
-		if (f_is_cursor == 1) {
-			frag_colour = vec4(vec3(1.0, 1.0, 1.0) -
-					   frag_colour.rgb, 1.0);
-		}
-
 		return;
 	}
 
 	vec3 fg = f_fg_colour;
 	vec3 bg = f_bg_colour;
-
-	if (f_is_cursor == 1) {
-		vec3 tmp = fg;
-		fg = bg;
-		bg = tmp;
-	}
 
 	// 176 and 191 are the first and last box-drawing characters
 	if (u_use_user_font && (f_char_code < 176 || f_char_code >= 224)) {

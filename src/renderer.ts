@@ -69,8 +69,6 @@ export class Renderer {
 			cols: "u_cols",
 			canvas_rows: "u_canvas_rows",
 			canvas_cols: "u_canvas_cols",
-			mouse_row: "u_mouse_row",
-			mouse_col: "u_mouse_col",
 			palette: "u_palette",
 			bitmap_font: "u_bitmap_font",
 			texture: "u_texture",
@@ -164,7 +162,7 @@ export class Renderer {
 	 * draw is skipped. `dst` is in canvas cell coordinates and may extend
 	 * beyond the canvas; the shader clips via NDC. Use a `tglyphs` grid
 	 * sized to the texture's aspect so the texture isn't distorted. The
-	 * canvas's current palette and mouse position are applied each draw.
+	 * canvas's current palette is applied each draw.
 	 *
 	 * @example
 	 * ```ts
@@ -208,15 +206,6 @@ export class Renderer {
 		gl.uniform1i(this.uniforms.col, dst.col);
 		gl.uniform1i(this.uniforms.rows, tglyphs.rows);
 		gl.uniform1i(this.uniforms.cols, tglyphs.cols);
-		gl.uniform1i(
-			this.uniforms.mouse_row,
-			this.canvas.mouse_row ?? -1,
-		);
-		gl.uniform1i(
-			this.uniforms.mouse_col,
-			this.canvas.mouse_col ?? -1,
-		);
-
 		// set vertex buffer data to provided texture glyphs
 		gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
 		gl.bufferData(gl.ARRAY_BUFFER, tglyphs.data, gl.DYNAMIC_DRAW);

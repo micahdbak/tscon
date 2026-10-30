@@ -16,8 +16,6 @@ uniform int u_rows;
 uniform int u_cols;
 uniform int u_canvas_rows;
 uniform int u_canvas_cols;
-uniform int u_mouse_row;
-uniform int u_mouse_col;
 uniform vec3 u_palette[16];
 uniform sampler2D u_texture;
 
@@ -26,7 +24,6 @@ out vec2 v_tex_uv_coord; // sample mode
 out vec2 v_font_uv_coord;
 
 flat out uint f_mode;
-flat out int f_is_cursor;
 flat out vec3 f_fg_colour;
 flat out vec3 f_bg_colour;
 flat out ivec2 f_glyph_coord;
@@ -141,9 +138,6 @@ void main() {
 	int origin_row = int(a_row);
 	int origin_col = int(a_col);
 
-	f_is_cursor = int(origin_row + u_row == u_mouse_row &&
-			  origin_col + u_col == u_mouse_col);
-
 	/* A glyph is made up of two triangles, six vertices:
 	 *
 	 *   0--2     ,5     0--2,5
@@ -210,11 +204,6 @@ void main() {
 		glyph = getBgGlyph(dim, lum);
 	} else {
 		glyph = getGlyph(dim, lum);
-	}
-
-	if (glyph.fg_idx == glyph.bg_idx && f_is_cursor == 1) {
-		glyph.fg_idx = 15;
-		glyph.bg_idx = 0;
 	}
 
 	f_fg_colour = u_palette[glyph.fg_idx];

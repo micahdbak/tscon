@@ -88,8 +88,6 @@ export class Terminal {
 		this.uniforms = getUniformLocations(gl, this.gl_program, {
 			rows: "u_rows",
 			cols: "u_cols",
-			mouse_row: "u_mouse_row",
-			mouse_col: "u_mouse_col",
 			palette: "u_palette",
 			bitmap_font: "u_bitmap_font",
 			user_font: "u_user_font",
@@ -145,8 +143,6 @@ export class Terminal {
 		gl.useProgram(this.gl_program);
 		gl.uniform1i(this.uniforms.rows, this.canvas.rows);
 		gl.uniform1i(this.uniforms.cols, this.canvas.cols);
-		gl.uniform1i(this.uniforms.mouse_row, -1);
-		gl.uniform1i(this.uniforms.mouse_col, -1);
 		gl.uniform1i(this.uniforms.bitmap_font, 0);
 		gl.uniform1i(this.uniforms.user_font, 1);
 		gl.uniform1i(this.uniforms.use_user_font, 0);
@@ -312,8 +308,7 @@ export class Terminal {
 	 *
 	 * If {@link detail_text} changed since the last draw it is recompiled
 	 * to glyphs and blitted across the bottom row. Then the framebuffer
-	 * is uploaded and drawn with the canvas's current palette and mouse
-	 * position.
+	 * is uploaded and drawn with the canvas's current palette.
 	 *
 	 * Call this once per frame after all {@link blit} calls are done.
 	 */
@@ -356,16 +351,6 @@ export class Terminal {
 		const gl = this.canvas.gl;
 		gl.useProgram(this.gl_program);
 		gl.uniform3fv(this.uniforms.palette, this.canvas.palette);
-
-		// set mouse position uniforms
-		gl.uniform1i(
-			this.uniforms.mouse_row,
-			this.canvas.mouse_row ?? -1,
-		);
-		gl.uniform1i(
-			this.uniforms.mouse_col,
-			this.canvas.mouse_col ?? -1,
-		);
 
 		// upload glyph data to the GPU
 		gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);

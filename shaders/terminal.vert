@@ -5,8 +5,6 @@ in uint a_char_code;
 
 uniform int u_rows;
 uniform int u_cols;
-uniform int u_mouse_row;
-uniform int u_mouse_col;
 uniform vec3 u_palette[16];
 
 out vec2 v_cell_coord;
@@ -20,8 +18,6 @@ flat out uint f_char_code;
 void main() {
 	int row = gl_InstanceID / u_cols;
 	int col = gl_InstanceID % u_cols;
-	int is_cursor = int(u_mouse_row == row && u_mouse_col == col);
-	int not_is_cursor = int(is_cursor == 0);
 
 	if (a_colour == 0u && a_char_code == 0u) {
 		// clipped: don't cover any pixels below this glyph
@@ -33,8 +29,8 @@ void main() {
 	// 240 = 0b11110000
 	int colour = int(a_colour + uint(a_colour == 0u) * 240u);
 
-	int fg_idx = int(colour >> (not_is_cursor * 4) & 0xf);
-	int bg_idx = int(colour >> (is_cursor * 4) & 0xf);
+	int fg_idx = int((colour >> 4) & 0xf);
+	int bg_idx = int(colour & 0xf);
 
 	f_fg_colour = u_palette[fg_idx];
 	f_bg_colour = u_palette[bg_idx];
