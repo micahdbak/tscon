@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { Canvas } from "./canvas.ts";
 import { TestCanvasHost } from "./canvas_host.ts";
 import { Glyphs } from "./glyphs.ts";
-import { Palette } from "./colour.ts";
+import { DEFAULT_COLOURS, Palette } from "./colour.ts";
 import { HeadlessGL2 } from "./headless_gl.ts";
 import { Renderer } from "./renderer.ts";
 import { Terminal } from "./terminal.ts";
@@ -38,6 +38,30 @@ function lastPalette(gl: PaletteGL): number[] {
 }
 
 describe("colour palette", () => {
+	test("DEFAULT_COLOURS has 16 colours", () => {
+		expect(DEFAULT_COLOURS).toHaveLength(16);
+	});
+
+	test("Palette copies colours and clamps them when converting", () => {
+		const palette = new Palette([
+			[255, 0, 0],
+			[0, 256, -1],
+			[128.6, 0, 0],
+		]);
+		const floats = palette.toFloats();
+
+		expect(floats).toHaveLength(48);
+		expect(floats[0]).toBe(1);
+		expect(floats[1]).toBe(0);
+		expect(floats[2]).toBe(0);
+		expect(floats[3]).toBe(0);
+		expect(floats[4]).toBe(1);
+		expect(floats[5]).toBe(0);
+		expect(floats[6]).toBeCloseTo(129 / 255);
+		expect(floats[9]).toBeCloseTo(DEFAULT_COLOURS[3]![0] / 0xff);
+		expect(palette.toFloats()).not.toBe(floats);
+	});
+
 	test("Terminal.draw uses the current palette", () => {
 		const { gl, canvas, terminal } = harness();
 		const glyphs = new Glyphs("x", 1);
