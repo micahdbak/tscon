@@ -1,4 +1,8 @@
 export { Canvas } from "./canvas.ts";
+export { TestCanvasHost, WebCanvasHost } from "./canvas_host.ts";
+export type { CanvasHost, CanvasHostEventMap } from "./canvas_host.ts";
+export type { Key, WheelMode } from "./input.ts";
+export { HeadlessGL2, createHeadlessGL2 } from "./headless_gl.ts";
 export { Terminal } from "./terminal.ts";
 export type { Cell, CellSpan } from "./cell.ts";
 export { Glyphs } from "./glyphs.ts";

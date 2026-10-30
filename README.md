@@ -21,7 +21,7 @@ npm install @micahdb/tscon
 ```ts
 import { Canvas, Glyphs, Terminal } from "@micahdb/tscon";
 
-const canvas = new Canvas(document.querySelector("canvas")!);
+const canvas = Canvas.from(document.querySelector("canvas")!);
 const terminal = new Terminal(canvas);
 
 // compile the text once, at the width you want it to fill
@@ -120,6 +120,112 @@ const cleared = glyphs.mapCells(
     () => 0,
     { row: 2, col: 0, rows: 1, cols: 10 },
 );
+```
+
+## Hosts
+
+`Canvas` reads size and input from a `CanvasHost` and draws through an
+injected WebGL2 context. `Canvas.from(element)` creates the normal browser
+host and context for you:
+
+```ts
+import { Canvas } from "@micahdb/tscon";
+
+const canvas = Canvas.from(document.querySelector("canvas")!);
+```
+
+It throws when a WebGL2 context cannot be acquired.
+
+Use the constructor when you need to supply the host or context yourself:
+
+```ts
+import { Canvas, WebCanvasHost } from "@micahdb/tscon";
+
+const host = new WebCanvasHost(canvasElement);
+const gl = canvasElement.getContext("webgl2")!;
+const canvas = new Canvas(host, gl);
+```
+
+`WebCanvasHost` owns the element's DPR sizing, focus, pointer capture, and
+native listener wiring. `Canvas` itself owns the cell grid, WebGL resources,
+input state, and events. Keyboard events are dispatched before the built-in
+key scrolling; call `event.detail.prevent_default()` to suppress both the
+browser default and that scrolling. Call `canvas.dispose()` to remove host
+listeners.
+
+## Testing
+
+tscon tests run headlessly with Bun. `TestCanvasHost` supplies virtual DOM
+size, focus, pointer, wheel, keyboard, and resize events, while
+`createHeadlessGL2()` supplies a WebGL2-shaped no-op context. The real
+`Canvas`, `Terminal`, and `Renderer` can therefore be constructed and used
+without a browser or GPU:
+
+```ts
+import { describe, expect, test } from "bun:test";
+import {
+    Canvas,
+    TestCanvasHost,
+    Terminal,
+    createHeadlessGL2,
+} from "@micahdb/tscon";
+
+const host = new TestCanvasHost({ css_width: 800, css_height: 480 });
+const canvas = new Canvas(host, createHeadlessGL2());
+const terminal = new Terminal(canvas);
+
+const wheel: number[] = [];
+canvas.addEventListener("wheel", (event) => {
+    wheel.push((event as CustomEvent<{ rows: number }>).detail.rows);
+});
+
+describe("canvas input", () => {
+    test("j emits one wheel row when focused", () => {
+        host.focus();
+        host.keyDown("j");
+
+        expect(wheel).toEqual([1]);
+    });
+
+    test("pointer positions land on cells", () => {
+        host.pointerAtCell(2, 3, canvas.rows, canvas.cols);
+
+        expect(canvas.mouseAt(2, 3, 1, 1)).toBe(true);
+    });
+
+    test("press and release produces a click", () => {
+        host.pointerMove(40, 80);
+        host.pointerDown(40, 80);
+        host.pointerUp(40, 80);
+
+        expect(canvas.mouse_click).toBe(true);
+    });
+});
+```
+
+Inject exact situations through the test host:
+
+- `resize(cssWidth, cssHeight, dpr?)`
+- `focus()` / `blur()`
+- `pointerMove`, `pointerAtCell`, `pointerDown`, `pointerUp`,
+  `pointerCancel`, `pointerLeave`
+- `wheel(deltaY, deltaMode?)`
+- `keyDown` / `keyUp`
+
+`TestCanvasHost.default_prevented` reports whether the last key event called
+`prevent_default`. The headless context is intentionally a no-op: tests should
+assert on `Canvas` state, emitted events, and compiled `Glyphs`, not on GPU
+pixels. Use a real browser for visual checks.
+
+Run the checks in this order:
+
+```sh
+bun test                 # the whole suite
+bun test src/canvas.test.ts
+bun test src/glyphs.test.ts
+bun run typecheck
+bun run lint
+bun run build
 ```
 
 ## Development

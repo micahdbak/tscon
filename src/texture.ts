@@ -15,7 +15,7 @@
  * ```ts
  * import { Canvas, loadTexture } from "@micahdb/tscon";
  *
- * const canvas = new Canvas(element);
+ * const canvas = Canvas.from(element);
  * const texture = await loadTexture(canvas.gl, "/images/portrait.jpeg");
  * ```
  *
@@ -91,7 +91,7 @@ export function loadTexture(
  * ```ts
  * import { Canvas, loadCubeMap } from "@micahdb/tscon";
  *
- * const canvas = new Canvas(element);
+ * const canvas = Canvas.from(element);
  * const skybox = await loadCubeMap(canvas.gl, [
  *   "/images/skybox/right.png",
  *   "/images/skybox/left.png",

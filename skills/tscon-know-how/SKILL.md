@@ -1,6 +1,8 @@
 ---
 name: tscon-know-how
-description: How to build, debug, and explain apps using the @micahdb/tscon WebGL2 text-mode graphics library.
+description: >-
+  How to build, debug, and explain apps using the @micahdb/tscon WebGL2
+  text-mode graphics library.
 ---
 
 # Using @micahdb/tscon
@@ -16,9 +18,14 @@ contracts, and the downstream practices.
 
 API map (roles, not signatures):
 
-- **`Canvas`**: owns the WebGL2 context, the cell-grid dimensions, the palette,
-  the built-in font plus an optional application font, and all mouse, wheel, and
-  keyboard state. Everything else is constructed from it.
+- **`Canvas`**: owns the cell-grid dimensions, the palette, the built-in font
+  plus an optional application font, WebGL resources, and all mouse, wheel, and
+  keyboard state. Construct it with a `CanvasHost` and a WebGL2 context, or use
+  `Canvas.from(element)` for browser boot.
+- **Hosts and testing**: `CanvasHost` reports element size, DPR, focus, and
+  normalized pointer/wheel/key events. `WebCanvasHost` is the browser
+  implementation; `TestCanvasHost` injects events for headless tests.
+  `HeadlessGL2` / `createHeadlessGL2()` provide a no-op WebGL2 context.
 - **Text**: `Glyphs` compiles escape-formatted text into a cell grid and answers
   where anything in the text ended up (`renderedCell`, `cursorCell`,
   `cursorIndex`, `rowCols`, `spansFor`, `mapCells`). `textToLines` does the
@@ -146,19 +153,23 @@ and background.
 
 ### Canvas: grid, resize, input
 
-- **Arbitrary placement is supported.** Mouse coordinates are computed relative
-  to the element's bounding rectangle, so the canvas works anywhere on a page,
-  including embedded inside a scrolling document. For a page-style app, size the
-  element with CSS to fill the viewport:
+- **Arbitrary placement is supported.** `WebCanvasHost` computes mouse
+  coordinates relative to the element's bounding rectangle, so the canvas works
+  anywhere on a page, including embedded inside a scrolling document. For a
+  page-style app, size the element with CSS to fill the viewport:
   `position: fixed; inset: 0; width/height: 100svw/100svh;` plus
   `touch-action: none; user-select: none;`.
-- **Grid size** follows the element: `canvas.rows` and `canvas.cols` are derived
+- **Grid size** follows the host: `canvas.rows` and `canvas.cols` are derived
   from its size and device pixel ratio, rows capped at 256 and columns at 1024.
   Cells stretch to fill the element, so their exact size is usually fractional.
 - **`Canvas` is an `EventTarget`.** `"resize"` fires only when the cell counts
-  change; a pixel-only resize silently updates the buffer. `"wheel"` is a
-  `CustomEvent` whose `detail.rows` is already in whole rows; trackpad deltas
-  accumulate until they cross a cell height, so scrolling stays smooth.
+  change; a pixel-only resize still updates cell sizes and the GL viewport
+  without firing. `"wheel"` is a `CustomEvent` whose `detail.rows` is already in
+  whole rows; trackpad deltas accumulate until they cross a cell height, so
+  scrolling stays smooth.
+  `"keydown"` / `"keyup"` carry a `Key` detail and fire before the
+  built-in key scrolling; call `detail.prevent_default()` to suppress both the
+  native action and that scrolling.
 - **Input state, in cell units**: `mouse_row/col` (`undefined` while the pointer
   is off-canvas; guard before arithmetic), `mouse_down`, `mouse_down_row/col`
   (press origin; hit-test clicks against this so a drag that leaves the rect
@@ -166,12 +177,73 @@ and background.
   consume it, the app resets it at end of frame), `mouse_owner` (a drag claims
   this string; other components yield while it is set), `class_name` (components
   set a cursor class here; the app syncs it to `document.body`). Keyboard
-  scrolling (j/k/arrows, `0` = jump to top, hold-to-repeat) is built in and
-  emits the same `"wheel"` events. It engages only while the pointer is over the
-  canvas or the canvas has DOM focus (the constructor adds `tabindex=0` unless
-  the app set its own), it never fires while focus is in a text input, and it
-  stops when the pointer leaves or focus moves away. All mouse state resets on
-  resize and window blur.
+  scrolling (j/k/arrows, `0` = jump to top) is built in and emits the same
+  `"wheel"` events; repeats follow the platform's native key repeat events. It
+  engages only while the pointer is over the canvas or the canvas has DOM focus
+  (`WebCanvasHost` adds `tabindex=0` unless the app set its own), it never fires
+  while focus is in a text input, and it stops when the pointer leaves or focus
+  moves away. Pointer state resets on resize; window blur cancels the press and
+  click.
+
+## Testing headlessly
+
+tscon tests run under Bun without a browser:
+
+```sh
+bun test
+bun test src/canvas.test.ts
+bun run typecheck
+bun run lint
+bun run build
+```
+
+`TestCanvasHost` supplies virtual CSS/device size, focus, and normalized input
+events. `createHeadlessGL2()` supplies a WebGL2-shaped no-op context. The real
+`Canvas`, `Terminal`, and `Renderer` run against both, so tests exercise
+production code instead of a fake terminal:
+
+```ts
+import { describe, expect, test } from "bun:test";
+import {
+    Canvas,
+    TestCanvasHost,
+    Terminal,
+    createHeadlessGL2,
+} from "@micahdb/tscon";
+
+const host = new TestCanvasHost({ css_width: 800, css_height: 480 });
+const canvas = new Canvas(host, createHeadlessGL2());
+const terminal = new Terminal(canvas);
+
+const wheel: number[] = [];
+canvas.addEventListener("wheel", (event) => {
+    wheel.push((event as CustomEvent<{ rows: number }>).detail.rows);
+});
+
+describe("input", () => {
+    test("keyboard scrolling emits wheel rows", () => {
+        host.focus();
+        host.keyDown("j");
+
+        expect(wheel).toEqual([1]);
+    });
+
+    test("pointer positions land on cells", () => {
+        host.pointerAtCell(2, 3, canvas.rows, canvas.cols);
+
+        expect(canvas.mouseAt(2, 3, 1, 1)).toBe(true);
+    });
+});
+```
+
+Inject exact situations with `resize`, `focus` / `blur`, `pointerMove`,
+`pointerAtCell`, `pointerDown`, `pointerUp`, `pointerCancel`,
+`pointerLeave`, `wheel`, `keyDown`, and `keyUp`. `TestCanvasHost.default_prevented`
+reports whether the last key event called `prevent_default`.
+
+The headless context is intentionally a no-op. Assert on `Canvas` state,
+emitted events, and compiled `Glyphs`; use a real browser for visual output.
+Call `canvas.dispose()` when a test is done with its host.
 
 ## Recipe 1: bootstrap and frame loop
 
@@ -180,16 +252,17 @@ and background.
    works too. If content must survive without WebGL2, pre-render the same text to
    a `<pre>` fallback at build time and hide it once a WebGL2 context is
    acquired (this is what the author's site micahdb.com does). Done when: the
-   canvas fills its intended area and `new Canvas(el)` does not throw.
-2. **Construct once:** `new Canvas(el)`, `new Terminal(canvas)`,
+   canvas fills its intended area and `Canvas.from(el)` does not throw.
+2. **Construct once:** `Canvas.from(el)`, `new Terminal(canvas)`,
    `new Renderer(canvas)`. Done when: all three construct (they throw on missing
-   WebGL2 or shader errors).
+   WebGL2 or shader errors). Use `new Canvas(host, gl)` only when supplying a
+   custom host or context.
 3. **Frame loop, in this exact order.** Ordering is what makes compositing work:
 
 ```ts
 import { Canvas, Glyphs, Renderer, Terminal } from "@micahdb/tscon";
 
-const canvas = new Canvas(document.querySelector("canvas")!);
+const canvas = Canvas.from(document.querySelector("canvas")!);
 const terminal = new Terminal(canvas);
 const renderer = new Renderer(canvas);
 
