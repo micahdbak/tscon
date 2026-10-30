@@ -108,6 +108,16 @@ describe("Glyphs compilation", () => {
 		]);
 	});
 
+	test("raw tabs advance to the next tab stop", () => {
+		const glyphs = new Glyphs("x\tabc", 20, { wrap: Wrap.HARD, raw: true });
+
+		expect(glyphs.renderedCell(0)).toEqual({ row: 0, col: 0 });
+		expect(glyphs.renderedCell(1)).toBeNull();
+		expect(glyphs.renderedCell(2)).toEqual({ row: 0, col: 8 });
+		expect(glyphs.cursorCell(1)).toEqual({ row: 0, col: 1 });
+		expect(glyphs.cursorIndex(0, 4)).toBe(1);
+	});
+
 	test("raw renders every escape literally", () => {
 		const source = `x${B}f1y${B}a0z`;
 		const glyphs = new Glyphs(source, 10, { raw: true });
@@ -246,6 +256,14 @@ describe("Glyphs positions", () => {
 		expect(glyphs.rowCols(1)).toBe(0);
 		expect(glyphs.cursorIndex(1, 0)).toBe(7);
 		expect(glyphs.cursorCell(4)).toEqual({ row: 2, col: 0 });
+	});
+
+	test("hard wrap counts tab columns when placing cells", () => {
+		const glyphs = new Glyphs("x\tabcdefghijklm", 20, { wrap: Wrap.HARD });
+
+		expect(glyphs.rows).toBe(2);
+		expect(glyphs.renderedCell(2)).toEqual({ row: 0, col: 8 });
+		expect(glyphs.renderedCell(14)).toEqual({ row: 1, col: 0 });
 	});
 
 	test("hard wrap keeps every character addressable", () => {

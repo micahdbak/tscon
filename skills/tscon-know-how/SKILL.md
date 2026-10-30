@@ -82,6 +82,7 @@ const g = new Glyphs("Hi \\a0{Docs|#docs}Docs", 20);
 g.rows;                    // 1
 g.anchors[0]![0]!.options; // "Docs|#docs"
 g.anchors[0]![0]!.col;     // 3: the cell "D" draws in
+g.anchors[0]![0]!.index;   // 18: where "D" starts in the source
 g.renderedCell(18);        // { row: 0, col: 3 }: where "D" draws
 g.renderedCell(13);        // null: index 13 is inside the anchor
 g.cursorIndex(0, 5);       // 20: the source character under that cell
@@ -328,9 +329,10 @@ requestAnimationFrame(draw);
 
 1. **Author content** as text with escapes. Link convention:
    `\a0{Text|URL}Visible_Text`; the anchor sits immediately before visible text
-   of the same length, and link text uses underscores instead of spaces so word
-   wrap (which breaks at spaces) keeps it on one line, because the component
-   overlays exactly `text.length` cells. Done when:
+   of the same length. `Visible_Text` supplies the source range, wrap geometry,
+   and hit targets, while the `Text` payload supplies the glyphs that are drawn
+   over those cells. The visible text can therefore use underscores instead of
+   spaces to keep a word-wrapped link on one line. Done when:
    `new Glyphs(content, cols).anchors[0]?.length` equals your link count.
 2. **Compile per width**:
    `content = new Glyphs(str, Math.min(80, canvas.cols - padding))` at

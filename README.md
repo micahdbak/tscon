@@ -55,7 +55,9 @@ positions:
 | `\\` | a literal backslash |
 
 A newline starts a new line, `\` before a newline joins two lines, and a tab
-advances to the next multiple of `TAB_WIDTH`.
+advances to the next multiple of `TAB_WIDTH`. Raw mode
+(`new Glyphs(text, cols, { raw: true })`) renders escapes literally; tabs still
+advance to their next tab stop.
 
 `Glyphs` compiles text for a given width. The grid it produces can be blitted
 directly, and can also answer where things ended up:
@@ -88,7 +90,8 @@ inline images, headings, hit targets.
 
 ```ts
 const g = new Glyphs("\\a0{Docs|#docs}Docs", 20);
-const link = g.anchors[0]![0]!;   // { options: "Docs|#docs", row: 0, col: 0 }
+const link = g.anchors[0]![0]!;
+// { options: "Docs|#docs", row: 0, col: 0, index: 15 }
 ```
 
 ## Textures

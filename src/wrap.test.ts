@@ -90,9 +90,29 @@ describe("hard wrap", () => {
 		expect(textToLines(line, 2, { wrap: Wrap.HARD })).toEqual([`x${B}f1y`, `${B}a0z`]);
 	});
 
+	test("tabs advance by their visible width", () => {
+		expect(
+			textToLines("x\tabcdefghijklm", 20, { wrap: Wrap.HARD }),
+		).toEqual(["x\tabcdefghijkl", "m"]);
+
+		expect(
+			textToLines("ab\tcd", 5, { wrap: Wrap.HARD }),
+		).toEqual(["ab\t", "cd"]);
+	});
+
 	test("newlines still break lines", () => {
 		expect(textToLines("abcd\nef", 3, { wrap: Wrap.HARD })).toEqual(["abc", "d", "ef"]);
 		expect(textToLines("ab\ncd", 5, { wrap: Wrap.HARD })).toEqual(["ab", "cd"]);
+	});
+
+	test("raw hard wrap still expands tabs", () => {
+		expect(
+			textToLines("x\tabcdefghijklm", 20, { wrap: Wrap.HARD, raw: true }),
+		).toEqual(["x\tabcdefghijkl", "m"]);
+
+		expect(
+			textToLines("ab\tcd", 5, { wrap: Wrap.HARD, raw: true }),
+		).toEqual(["ab\t", "cd"]);
 	});
 
 	test("raw breaks at the budget with escapes visible", () => {

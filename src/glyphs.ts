@@ -199,8 +199,25 @@ export class Glyphs {
 			for (let i = 0; i < piece.length; ) {
 				const source_index = layout.source[layout.starts[row] + i]!;
 
-				// raw: every character is a visible cell, escapes
-				// included, mapping one-to-one with the source
+				// raw: every character is visible, escapes
+				// included, mapping one-to-one with the source; tabs
+				// still advance to the next tab stop
+				if (raw && piece[i] === "\t") {
+					const tab_cols = Math.min(
+						TAB_WIDTH - (col % TAB_WIDTH),
+						Math.max(0, this.cols - col),
+					);
+
+					for (let tabbed = col; tabbed < col + tab_cols; tabbed++) {
+						row_map[tabbed] = source_index;
+					}
+
+					this.source_to_cursor[source_index] = { row, col };
+					col += tab_cols;
+					i++;
+					continue;
+				}
+
 				if (raw) {
 					emit(piece[i]!, source_index);
 					i++;

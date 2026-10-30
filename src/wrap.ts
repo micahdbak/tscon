@@ -348,7 +348,8 @@ function wrapLines(
 
 // the hard mode: rows of exactly `cols` visible characters, zero-width
 // escapes attached to the visible character they precede. Raw mode is
-// the same walk with every character visible
+// the same walk with every character visible; tabs still advance to the
+// next tab stop
 function hardWrapLines(text: string, cols: number, raw: boolean): Laid {
 	const pieces: string[] = [];
 	const starts: number[] = [];
@@ -373,7 +374,8 @@ function hardWrapLines(text: string, cols: number, raw: boolean): Laid {
 			continue;
 		}
 
-		// raw mode: every character is a visible column, escapes included
+		// raw mode: every character is visible, escapes included; tabs
+		// still advance to the next tab stop
 		if (raw) {
 			if (used === cols) {
 				pieces.push(line);
@@ -384,7 +386,9 @@ function hardWrapLines(text: string, cols: number, raw: boolean): Laid {
 			}
 
 			line += c;
-			used++;
+			used += c === "\t"
+				? Math.min(TAB_WIDTH - (used % TAB_WIDTH), cols - used)
+				: 1;
 			i++;
 			continue;
 		}
@@ -415,7 +419,9 @@ function hardWrapLines(text: string, cols: number, raw: boolean): Laid {
 		}
 
 		line += chunk;
-		used++;
+		used += c === "\t"
+			? Math.min(TAB_WIDTH - (used % TAB_WIDTH), cols - used)
+			: 1;
 		i += scan.chars;
 	}
 
