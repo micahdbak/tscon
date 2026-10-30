@@ -1,4 +1,5 @@
 export { Canvas } from "./canvas.ts";
+export type { CanvasOptions } from "./canvas.ts";
 export { TestCanvasHost, WebCanvasHost } from "./canvas_host.ts";
 export type { CanvasHost, CanvasHostEventMap } from "./canvas_host.ts";
 export type { Key, WheelMode } from "./input.ts";
@@ -21,6 +22,7 @@ export {
 	getUniformLocations,
 } from "./program.ts";
 export { renderCp437 } from "./cp437.ts";
-export { Colour, PALETTE } from "./colour.ts";
+export { Colour, DEFAULT_COLOURS, Palette } from "./colour.ts";
+export type { Rgb } from "./colour.ts";
 export type { Rect } from "./rect.ts";
 export { loadCubeMap, loadTexture } from "./texture.ts";

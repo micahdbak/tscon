@@ -142,7 +142,6 @@ export class Renderer {
 		gl.uniform1i(this.uniforms.cols, 0);
 		gl.uniform1i(this.uniforms.canvas_rows, this.canvas.rows);
 		gl.uniform1i(this.uniforms.canvas_cols, this.canvas.cols);
-		gl.uniform3fv(this.uniforms.palette, this.canvas.palette);
 		gl.uniform1i(this.uniforms.bitmap_font, 0);
 		gl.uniform1i(this.uniforms.texture, 1);
 		gl.uniform1i(this.uniforms.user_font, 2);
@@ -164,7 +163,8 @@ export class Renderer {
 	 * `tglyphs.rows`/`cols` must match `dst.rows`/`cols`; otherwise the
 	 * draw is skipped. `dst` is in canvas cell coordinates and may extend
 	 * beyond the canvas; the shader clips via NDC. Use a `tglyphs` grid
-	 * sized to the texture's aspect so the texture isn't distorted.
+	 * sized to the texture's aspect so the texture isn't distorted. The
+	 * canvas's current palette and mouse position are applied each draw.
 	 *
 	 * @example
 	 * ```ts
@@ -188,6 +188,7 @@ export class Renderer {
 
 		const gl = this.canvas.gl;
 		gl.useProgram(this.gl_program);
+		gl.uniform3fv(this.uniforms.palette, this.canvas.palette);
 
 		if (this.resized) {
 			this.resized = false;

@@ -122,6 +122,31 @@ const cleared = glyphs.mapCells(
 );
 ```
 
+## Palette
+
+The terminal uses a 16-colour palette made of 8-bit `[R, G, B]` triples.
+`DEFAULT_COLOURS` is the default, ordered by `Colour`. Pass a partial or complete
+palette when constructing a canvas, or replace it at runtime:
+
+```ts
+import { Canvas, Colour, DEFAULT_COLOURS, Palette } from "@micahdb/tscon";
+
+const palette = new Palette(DEFAULT_COLOURS);
+palette.colours[Colour.RED] = [0xff, 0x00, 0x00];
+
+const canvas = Canvas.from(element, { palette });
+
+// replace it later; missing entries fall back to the default colours
+canvas.setPalette(new Palette([
+    [0x08, 0x08, 0x08],
+    [0xff, 0x00, 0x00],
+]));
+```
+
+Channels outside `0`-`255` are clamped and rounded. `Terminal` and `Renderer`
+apply the canvas's current palette on every draw, so changes take effect on
+the next frame.
+
 ## Hosts
 
 `Canvas` reads size and input from a `CanvasHost` and draws through an

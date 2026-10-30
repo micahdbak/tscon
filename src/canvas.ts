@@ -1,7 +1,22 @@
 import { WebCanvasHost, type CanvasHost } from "./canvas_host.ts";
-import { PALETTE } from "./colour.ts";
+import { DEFAULT_COLOURS, Palette } from "./colour.ts";
 import { pointerCell, scrollRowsForKey, wheelRows, type Key, type WheelMode } from "./input.ts";
 import { loadModernDosTexture } from "./moderndos.ts";
+
+/**
+ * Options for constructing a {@link Canvas}.
+ *
+ * @example
+ * ```ts
+ * const canvas = Canvas.from(element, {
+ *   palette: new Palette([[0xff, 0x00, 0x00]]),
+ * });
+ * ```
+ */
+export type CanvasOptions = {
+	/** Initial 16-colour palette; missing entries use the built-in defaults. */
+	palette?: Palette;
+};
 
 /**
  * A WebGL2 canvas presented as a grid of character cells.
@@ -95,10 +110,10 @@ export class Canvas extends EventTarget {
 	mouse_down_col: number | undefined = undefined;
 
 	/**
-	 * The 16-colour palette as normalised `[R, G, B]` floats (divided by
-	 * `0xff`), derived from {@link PALETTE}.
+	 * The active 16-colour palette as normalised `[R, G, B]` floats
+	 * (divided by `0xff`). Use {@link setPalette} to change it.
 	 */
-	palette: Float32Array;
+	readonly palette: Float32Array;
 
 	/**
 	 * The built-in 8x16 bitmap font as a WebGL2 integer texture.
@@ -128,17 +143,20 @@ export class Canvas extends EventTarget {
 	 * context is used for clearing, the built-in font, and all rendering by
 	 * {@link Terminal} and {@link Renderer}.
 	 *
-	 * @param host  Browser or test surface to read from.
-	 * @param gl    WebGL2 context to draw through.
+	 * @param host     Browser or test surface to read from.
+	 * @param gl       WebGL2 context to draw through.
+	 * @param options  Initial palette and other canvas options.
 	 */
-	constructor(host: CanvasHost, gl: WebGL2RenderingContext) {
+	constructor(
+		host: CanvasHost,
+		gl: WebGL2RenderingContext,
+		options: CanvasOptions = {},
+	) {
 		super();
 		this.host = host;
 		this.gl = gl;
 		this.wheel_px = 0;
-		this.palette = new Float32Array(
-			PALETTE.flat().map((byte) => byte / 0xff),
-		);
+		this.palette = (options.palette ?? new Palette(DEFAULT_COLOURS)).toFloats();
 		this.bitmap_font = loadModernDosTexture(gl);
 		this.user_font = null;
 
@@ -176,10 +194,11 @@ export class Canvas extends EventTarget {
 	 * ```
 	 *
 	 * @param element  The `<canvas>` element to render into.
+	 * @param options  Initial palette and other canvas options.
 	 * @returns        A canvas backed by the element.
 	 * @throws         When a WebGL2 context cannot be acquired.
 	 */
-	static from(element: HTMLCanvasElement): Canvas {
+	static from(element: HTMLCanvasElement, options: CanvasOptions = {}): Canvas {
 		const host = new WebCanvasHost(element);
 		const gl = element.getContext("webgl2");
 
@@ -188,7 +207,7 @@ export class Canvas extends EventTarget {
 			throw new Error("No WebGL2 context");
 		}
 
-		return new Canvas(host, gl);
+		return new Canvas(host, gl, options);
 	}
 
 	/**
@@ -240,6 +259,24 @@ export class Canvas extends EventTarget {
 			this.mouse_down_col >= col &&
 			this.mouse_down_col < col + cols
 		);
+	}
+
+	/**
+	 * Replace the terminal palette.
+	 *
+	 * Entries are `[R, G, B]` bytes in the `0`-`255` range; out-of-range
+	 * channels are clamped, and missing entries use the built-in defaults. Existing
+	 * references to {@link palette} stay valid.
+	 *
+	 * @example
+	 * ```ts
+	 * canvas.setPalette(new Palette([[0xff, 0x00, 0x00]]));
+	 * ```
+	 *
+	 * @param palette  The new palette to apply.
+	 */
+	setPalette(palette: Palette): void {
+		this.palette.set(palette.toFloats());
 	}
 
 	/**

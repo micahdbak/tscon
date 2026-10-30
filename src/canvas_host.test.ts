@@ -2,6 +2,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 
 import { Canvas } from "./canvas.ts";
 import { TestCanvasHost, WebCanvasHost, type CanvasHostEventMap } from "./canvas_host.ts";
+import { Palette } from "./colour.ts";
 import { createHeadlessGL2 } from "./headless_gl.ts";
 
 type FakeWindow = EventTarget & { devicePixelRatio: number };
@@ -143,10 +144,13 @@ describe("WebCanvasHost", () => {
 		(globalThis as Record<string, unknown>).window = window;
 
 		const element = fakeElement();
-		const canvas = Canvas.from(element as unknown as HTMLCanvasElement);
+		const canvas = Canvas.from(element as unknown as HTMLCanvasElement, {
+			palette: new Palette([[0xff, 0x00, 0x00]]),
+		});
 
 		expect(canvas.rows).toBe(30);
 		expect(canvas.cols).toBe(100);
+		expect(canvas.palette[0]).toBe(1);
 
 		canvas.dispose();
 	});

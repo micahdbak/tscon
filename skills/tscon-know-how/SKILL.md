@@ -21,7 +21,8 @@ API map (roles, not signatures):
 - **`Canvas`**: owns the cell-grid dimensions, the palette, the built-in font
   plus an optional application font, WebGL resources, and all mouse, wheel, and
   keyboard state. Construct it with a `CanvasHost` and a WebGL2 context, or use
-  `Canvas.from(element)` for browser boot.
+  `Canvas.from(element)` for browser boot. Use `Canvas.from(element, { palette })`
+  or `canvas.setPalette(...)` to change colours.
 - **Hosts and testing**: `CanvasHost` reports element size, DPR, focus, and
   normalized pointer/wheel/key events. `WebCanvasHost` is the browser
   implementation; `TestCanvasHost` injects events for headless tests.
@@ -31,7 +32,7 @@ API map (roles, not signatures):
   `cursorIndex`, `rowCols`, `spansFor`, `mapCells`). `textToLines` does the
   layout alone, returning strings. Options are `TextOptions` (`wrap`, `raw`),
   with `Wrap.WORD` / `Wrap.TRUNCATE` / `Wrap.HARD`. Supporting types: `Cell`,
-  `CellSpan`, `Anchor`, `Rect`, `Colour`, `PALETTE`, `TAB_WIDTH`.
+  `CellSpan`, `Anchor`, `Rect`, `Colour`, `DEFAULT_COLOURS`, `Palette`, `TAB_WIDTH`.
 - **Escapes**: `scanEscapeAt` and `hasEscape` inspect the escape format without
   compiling anything (`EscapeScan` describes what they find).
 - **Presenters**: `Terminal` draws a cell grid; `Renderer` with `textureGlyphs`
@@ -134,6 +135,26 @@ case.
   `renderer.use_user_font = true`. Those flags fall back to the built-in font
   while `canvas.user_font` is null, so async loading is safe: hold the texture in
   a nullable field and assign it inside the frame loop once it resolves.
+
+### Palette
+
+The palette is 16 `[R, G, B]` byte triples ordered by `Colour`.
+`DEFAULT_COLOURS` is the default. Supply an initial palette with `Canvas.from(element, { palette })`
+or `new Canvas(host, gl, { palette })`, and replace it at runtime with
+`canvas.setPalette(palette)`. Entries beyond the supplied array use `DEFAULT_COLOURS`;
+channels are clamped to `0`-`255` and rounded. `Terminal` and `Renderer` apply
+the current palette on every draw, and `Canvas.clear` uses palette entry 0 as
+the background.
+
+```ts
+import { Canvas, Colour, DEFAULT_COLOURS, Palette } from "@micahdb/tscon";
+
+const palette = new Palette(DEFAULT_COLOURS);
+palette.colours[Colour.RED] = [0xff, 0x00, 0x00];
+
+const canvas = Canvas.from(element, { palette });
+canvas.setPalette(new Palette([[0x08, 0x08, 0x08], [0xff, 0x00, 0x00]]));
+```
 
 ### Textures as cells
 

@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { Canvas } from "./canvas.ts";
 import { TestCanvasHost } from "./canvas_host.ts";
+import { DEFAULT_COLOURS, Palette } from "./colour.ts";
 import type { Key } from "./input.ts";
 import { createHeadlessGL2 } from "./headless_gl.ts";
 
@@ -49,6 +50,33 @@ describe("Canvas", () => {
 		expect(canvas.cols).toBe(100);
 		expect(canvas.actual_cell_width).toBe(8);
 		expect(canvas.actual_cell_height).toBe(16);
+	});
+
+	test("accepts an initial palette and clamps channels", () => {
+		const host = new TestCanvasHost({ css_width: 800, css_height: 480 });
+		const canvas = new Canvas(host, createHeadlessGL2(), {
+			palette: new Palette([[255, 0, 0], [0, 256, -10]]),
+		});
+
+		expect(canvas.palette[0]).toBe(1);
+		expect(canvas.palette[1]).toBe(0);
+		expect(canvas.palette[2]).toBe(0);
+		expect(canvas.palette[3]).toBe(0);
+		expect(canvas.palette[4]).toBe(1);
+		expect(canvas.palette[5]).toBe(0);
+		expect(canvas.palette[6]).toBeCloseTo(DEFAULT_COLOURS[2]![0] / 0xff);
+	});
+
+	test("setPalette updates the existing palette array", () => {
+		const { canvas } = harness();
+		const palette = canvas.palette;
+
+		canvas.setPalette(new Palette([[128.6, 0, 255]]));
+
+		expect(canvas.palette).toBe(palette);
+		expect(canvas.palette[0]).toBeCloseTo(129 / 255);
+		expect(canvas.palette[1]).toBe(0);
+		expect(canvas.palette[2]).toBe(1);
 	});
 
 	test("recomputes the grid and dispatches resize", () => {
