@@ -26,7 +26,7 @@ describe("Glyphs compilation", () => {
 	test("anchors record their position and payload", () => {
 		const glyphs = new Glyphs(`${B}a0{Foo|bar}Foo`, 10);
 
-		expect(glyphs.anchors[0]).toEqual([{ options: "Foo|bar", row: 0, col: 0 }]);
+		expect(glyphs.anchors[0]).toEqual([{ options: "Foo|bar", row: 0, col: 0, index: 12 }]);
 		expect(hex(glyphs)).toBe("f046,f06f,f06f,0,0,0,0,0,0,0");
 	});
 
@@ -83,28 +83,28 @@ describe("Glyphs compilation", () => {
 	test("anchors survive word wrap at the next row", () => {
 		const glyphs = new Glyphs(`aaa ${B}a0x`, 3);
 
-		expect(glyphs.anchors[0]).toEqual([{ options: null, row: 1, col: 0 }]);
+		expect(glyphs.anchors[0]).toEqual([{ options: null, row: 1, col: 0, index: 7 }]);
 	});
 
 	test("an anchor captures the cell of the glyph that follows it", () => {
 		// past a colour escape
 		expect(new Glyphs(`${B}a0${B}f1x`, 10).anchors[0]).toEqual([
-			{ options: null, row: 0, col: 0 },
+			{ options: null, row: 0, col: 0, index: 6 },
 		]);
 
 		// past a tab
 		expect(new Glyphs(`${B}a0\tx`, 10).anchors[0]).toEqual([
-			{ options: null, row: 0, col: 8 },
+			{ options: null, row: 0, col: 8, index: 4 },
 		]);
 
 		// past a wrap break
 		expect(new Glyphs(`aa ${B}a0x`, 2).anchors[0]).toEqual([
-			{ options: null, row: 1, col: 0 },
+			{ options: null, row: 1, col: 0, index: 6 },
 		]);
 
 		// with nothing following: the end of the last row
 		expect(new Glyphs(`ab${B}a0`, 10).anchors[0]).toEqual([
-			{ options: null, row: 0, col: 2 },
+			{ options: null, row: 0, col: 2, index: 5 },
 		]);
 	});
 

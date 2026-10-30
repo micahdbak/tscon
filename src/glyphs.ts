@@ -28,6 +28,7 @@ import type { Rect } from "./rect.ts";
  * g.anchors[0]![0]!.options; // "Foo|bar"
  * g.anchors[0]![0]!.row;     // 0
  * g.anchors[0]![0]!.col;     // 0: where "F" renders
+ * g.anchors[0]![0]!.index;   // 12: where "F" starts in the source
  * ```
  */
 export type Anchor = {
@@ -37,6 +38,8 @@ export type Anchor = {
 	row: number;
 	/** Column of the captured cell. */
 	col: number;
+	/** Source character index of the captured glyph. */
+	index: number;
 };
 
 /**
@@ -186,6 +189,7 @@ export class Glyphs {
 				for (const anchor of pending) {
 					anchor.row = row;
 					anchor.col = col;
+					anchor.index = source_index;
 				}
 
 				pending = [];
@@ -206,7 +210,7 @@ export class Glyphs {
 				const scan = scanEscapeAt(piece, i);
 
 				if (scan.kind === "anchor") {
-					const anchor: Anchor = { options: scan.options, row: 0, col: 0 };
+					const anchor: Anchor = { options: scan.options, row: 0, col: 0, index: 0 };
 					const group = this.anchors[scan.group] ?? [];
 
 					group.push(anchor);
@@ -266,6 +270,7 @@ export class Glyphs {
 			for (const anchor of pending) {
 				anchor.row = last;
 				anchor.col = this.rowCols(last);
+				anchor.index = layout.source.length;
 			}
 		}
 	}
