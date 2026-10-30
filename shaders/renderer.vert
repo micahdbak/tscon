@@ -47,6 +47,16 @@ struct Dims {
 };
 
 Dims getDims(vec3 colour) {
+	float hi = max(max(colour.r, colour.g), colour.b);
+	float lo = min(min(colour.r, colour.g), colour.b);
+
+	// channels within two 8-bit steps read as grey, which has no second
+	// dimension to dither against; normalize() would otherwise turn its
+	// rounding error into a ratio that flips lone cells to a hue
+	if (hi - lo < 2.0 / 255.0) {
+		return Dims(7, 7, 0.0);
+	}
+
 	vec3 ncolour = normalize(colour);
 	float d1 = 1000.0;
 	float d2 = 1000.0;
