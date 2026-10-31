@@ -58,9 +58,41 @@ function pointerEvent(type: string, x: number, y: number): Event {
 }
 
 const previous_window = (globalThis as Record<string, unknown>).window;
+const previous_resize_observer = (globalThis as Record<string, unknown>).ResizeObserver;
+
+// a ResizeObserver stand-in whose callbacks the tests fire by hand, standing in
+// for a browser that notices the element change size
+function fakeResizeObserver() {
+	const callbacks = new Set<() => void>();
+
+	(globalThis as Record<string, unknown>).ResizeObserver = class {
+		private readonly callback: () => void;
+
+		constructor(callback: () => void) {
+			this.callback = callback;
+		}
+
+		observe(): void {
+			callbacks.add(this.callback);
+		}
+
+		disconnect(): void {
+			callbacks.delete(this.callback);
+		}
+	};
+
+	return () => {
+		for (const callback of callbacks) {
+			callback();
+		}
+	};
+}
+
+const fire_resize = fakeResizeObserver();
 
 afterAll(() => {
 	(globalThis as Record<string, unknown>).window = previous_window;
+	(globalThis as Record<string, unknown>).ResizeObserver = previous_resize_observer;
 });
 
 describe("WebCanvasHost", () => {
@@ -137,6 +169,44 @@ describe("WebCanvasHost", () => {
 		expect(host.css_height).toBe(240);
 
 		host.dispose();
+	});
+
+	test("follows the element's own resize, not just the window's", () => {
+		const window = fakeWindow();
+		(globalThis as Record<string, unknown>).window = window;
+
+		const element = fakeElement();
+		const host = new WebCanvasHost(element as unknown as HTMLCanvasElement);
+		const widths: number[] = [];
+
+		host.on("resize", (event) => widths.push(event.css_width));
+
+		// a stylesheet arriving after construction, or a mobile viewport settling
+		element.setClientSize(390, 844);
+		fire_resize();
+
+		expect(host.css_width).toBe(390);
+		expect(host.css_height).toBe(844);
+		expect(element.width).toBe(390);
+		expect(widths).toEqual([390]);
+	});
+
+	test("ignores the echo of its own backing-store write", () => {
+		const window = fakeWindow();
+		(globalThis as Record<string, unknown>).window = window;
+
+		window.devicePixelRatio = 3;
+
+		const element = fakeElement();
+		const host = new WebCanvasHost(element as unknown as HTMLCanvasElement);
+
+		// an element with no CSS sizing takes its box from the attributes the
+		// host writes, so the observer must not treat that as a new size
+		element.setClientSize(element.width, element.height);
+		fire_resize();
+
+		expect(host.css_width).toBe(800);
+		expect(element.width).toBe(2400);
 	});
 
 	test("Canvas.from builds a canvas from the element", () => {

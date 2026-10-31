@@ -153,6 +153,11 @@ abstract class CanvasHostBase implements CanvasHost {
  * `devicePixelRatio` to the element's backing store and emits a normalized
  * `"resize"` event.
  *
+ * The element's box is observed directly, so a size change is followed
+ * wherever it comes from -- a window resize, a stylesheet arriving after the
+ * host was constructed, a dynamic viewport change on mobile, or the element
+ * being unhidden. Listening to `window` resizes alone misses all of those.
+ *
  * @example
  * ```ts
  * const host = new WebCanvasHost(canvasElement);
@@ -163,6 +168,13 @@ abstract class CanvasHostBase implements CanvasHost {
 export class WebCanvasHost extends CanvasHostBase {
 	/** The `<canvas>` element this host observes. */
 	readonly element: HTMLCanvasElement;
+
+	private readonly element_resize: ResizeObserver;
+
+	// the backing-store size last written, which an element with no CSS sizing
+	// takes as its box; used to ignore the observer echo of our own write
+	private written_width = 0;
+	private written_height = 0;
 
 	private readonly on_pointer_move = (event: PointerEvent): void => {
 		this.emit("pointermove", this.point(event.clientX, event.clientY));
@@ -254,6 +266,9 @@ export class WebCanvasHost extends CanvasHostBase {
 
 		this.resize();
 
+		this.element_resize = new ResizeObserver(() => this.resize());
+		this.element_resize.observe(element);
+
 		window.addEventListener("resize", this.on_resize);
 		window.addEventListener("pointermove", this.on_pointer_move);
 		window.addEventListener("keydown", this.on_key_down);
@@ -272,6 +287,8 @@ export class WebCanvasHost extends CanvasHostBase {
 
 	/** Remove all DOM and host listeners. */
 	override dispose(): void {
+		this.element_resize.disconnect();
+
 		window.removeEventListener("resize", this.on_resize);
 		window.removeEventListener("pointermove", this.on_pointer_move);
 		window.removeEventListener("keydown", this.on_key_down);
@@ -297,6 +314,12 @@ export class WebCanvasHost extends CanvasHostBase {
 		const pixel_width = css_width * dpr;
 		const pixel_height = css_height * dpr;
 
+		// an element sized by its attributes rather than by CSS reports the
+		// backing store we just wrote as its box; that echo is not a resize
+		if (css_width > 0 && css_width === this.written_width && css_height === this.written_height) {
+			return;
+		}
+
 		if (
 			css_width === this.css_width &&
 			css_height === this.css_height &&
@@ -313,6 +336,9 @@ export class WebCanvasHost extends CanvasHostBase {
 
 		this.element.width = pixel_width;
 		this.element.height = pixel_height;
+
+		this.written_width = pixel_width;
+		this.written_height = pixel_height;
 
 		this.emit("resize", {
 			css_width,
