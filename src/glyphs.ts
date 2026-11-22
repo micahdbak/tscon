@@ -3,7 +3,7 @@ import { TAB_WIDTH, layoutText } from "./wrap.ts";
 import type { TextLayout, TextOptions } from "./wrap.ts";
 import { Colour } from "./colour.ts";
 import { charCodeInCp437 } from "./cp437.ts";
-import type { Cell, CellSpan } from "./cell.ts";
+import { packCell, type Cell, type CellSpan } from "./cell.ts";
 import type { Rect } from "./rect.ts";
 
 /**
@@ -15,9 +15,7 @@ import type { Rect } from "./rect.ts";
  * the end of the last row when nothing follows. `options` is the escape's
  * `{...}` payload, or `null` when the braces are absent or empty.
  *
- * The application decides what each group (0-9) means and what to draw over
- * the marked cell: a link, an image, a heading, anything. See
- * {@link Glyphs.anchors}.
+ * Group numbers and payloads are application data. See {@link Glyphs.anchors}.
  *
  * @example
  * ```ts
@@ -43,20 +41,11 @@ export type Anchor = {
 };
 
 /**
- * Text compiled for the terminal: the wrapped rows, the cells to draw,
- * the anchors the text declares, and the translation between source
- * character indices and cell positions.
+ * Compiled text with wrapped rows, packed cells, anchors, and source positions.
  *
- * Compile once per text and width, then read from the result. Blit it with
- * {@link Terminal.blit}, place interactive components at
- * {@link Glyphs.anchors}, and ask where anything went with
- * {@link Glyphs.renderedCell}, {@link Glyphs.cursorCell},
- * {@link Glyphs.cursorIndex}, {@link Glyphs.rowCols},
- * {@link Glyphs.spansFor}, and {@link Glyphs.mapCells}.
- *
- * Positions are region-relative: rows are counted from the top of the grid
- * and columns from its left, the same coordinates {@link Rect} and
- * {@link Terminal.blit} use.
+ * Reuse a grid until its source or width changes. {@link Terminal.blit}
+ * takes zero-based positions relative to this grid. Source indices count
+ * UTF-16 code units in the original string, including escapes.
  *
  * @example
  * ```ts
@@ -67,7 +56,6 @@ export type Anchor = {
  * g.rows;                // 1
  * g.renderedCell(9);     // { row: 0, col: 6 }: where "w" draws
  * g.cursorIndex(0, 6);   // 9: the source character under a click there
- * g.anchors[0];          // \a0 anchors, if the text declared any
  * ```
  */
 export class Glyphs {
@@ -78,11 +66,11 @@ export class Glyphs {
 	readonly wrappedText: string[];
 
 	/**
-	 * The cells to draw, row-major with `rows * cols` entries, one 16-bit
+	 * The cells to draw, row-major with `rows * cols` entries, one 32-bit
 	 * value per cell. A cell of `0` is blank and paints nothing when
-	 * blitted.
+	 * blitted. Use {@link packCell} and {@link unpackCell} to work with the fields.
 	 */
-	readonly data: Uint16Array;
+	readonly data: Uint32Array;
 
 	/** Number of wrapped rows in the grid. */
 	readonly rows: number;
@@ -111,11 +99,8 @@ export class Glyphs {
 	/**
 	 * Compile `text` into a grid of wrapped rows, ready to blit.
 	 *
-	 * Escape sequences are interpreted: colour escapes recolour the
-	 * characters that follow, `\\` draws one backslash, anchors are recorded
-	 * in {@link Glyphs.anchors}, and a tab advances to the next multiple of
-	 * {@link TAB_WIDTH}. Text starts white-on-black, and characters outside
-	 * CP437 draw blank.
+	 * Uses {@link scanEscapeAt} unless raw mode is enabled. Tabs advance to
+	 * the next {@link TAB_WIDTH} stop, and characters outside CP437 draw blank.
 	 *
 	 * @example
 	 * ```ts
@@ -142,7 +127,7 @@ export class Glyphs {
 		this.wrappedText = layout.pieces;
 		this.rows = layout.pieces.length;
 		this.cols = this.rows > 0 ? cols : 0;
-		this.data = new Uint16Array(this.rows * this.cols);
+		this.data = new Uint32Array(this.rows * this.cols);
 		this.anchors = {};
 
 		this.visible_to_source = [];
@@ -153,13 +138,10 @@ export class Glyphs {
 		this.build(layout, opts.raw === true);
 	}
 
-	// renders the pieces into cells while mapping both ways between
-	// source indices and cell positions. Anchors record the cell of the
-	// glyph that follows them, so they stay pending across tabs, row
-	// breaks, and anything else that emits no cells
+	// Anchors remain pending across rows and tabs until a glyph is emitted.
 	private build(layout: TextLayout, raw: boolean): void {
-		let fg = Colour.WHITE;
-		let bg = Colour.BLACK;
+		let fg = Colour.FG;
+		let bg = Colour.BG;
 		let pending: Anchor[] = [];
 
 		for (const [row, piece] of layout.pieces.entries()) {
@@ -170,13 +152,7 @@ export class Glyphs {
 
 			const emit = (c: string, source_index: number): void => {
 				const char_code = charCodeInCp437(c.codePointAt(0) ?? 32);
-				const colour_byte = ((fg & 0xf) << 4) | (bg & 0xf);
-
-				// a space on the all-black colour byte is left as
-				// zero, which the shader clips; anything else paints
-				if (char_code !== 32 || colour_byte !== 0) {
-					this.data[row * this.cols + col] = (colour_byte << 8) | char_code;
-				}
+				this.data[row * this.cols + col] = packCell(char_code, fg, bg);
 
 				row_map[col] = source_index;
 
@@ -199,9 +175,6 @@ export class Glyphs {
 			for (let i = 0; i < piece.length; ) {
 				const source_index = layout.source[layout.starts[row] + i]!;
 
-				// raw: every character is visible, escapes
-				// included, mapping one-to-one with the source; tabs
-				// still advance to the next tab stop
 				if (raw && piece[i] === "\t") {
 					const tab_cols = Math.min(
 						TAB_WIDTH - (col % TAB_WIDTH),
@@ -239,8 +212,6 @@ export class Glyphs {
 				}
 
 				if (scan.kind === "colour") {
-					// clamp to the dark half; the bright bit is added
-					// by the capital form
 					const value = Math.min(scan.num, 7) + (scan.bright ? 8 : 0);
 
 					if (scan.attribute === "fg") {
@@ -249,6 +220,13 @@ export class Glyphs {
 						bg = value;
 					}
 
+					i += scan.chars;
+					continue;
+				}
+
+				if (scan.kind === "clear") {
+					fg = Colour.FG;
+					bg = Colour.BG;
 					i += scan.chars;
 					continue;
 				}
@@ -392,8 +370,7 @@ export class Glyphs {
 	 * row's first character; a position off the grid lands on the last
 	 * character in it.
 	 *
-	 * This is the reverse of {@link Glyphs.cursorCell}: hand it the cell the
-	 * pointer is over and get back the source index to place a cursor at.
+	 * Use {@link Glyphs.cursorCell} to map in the other direction.
 	 *
 	 * @example
 	 * ```ts
@@ -443,11 +420,8 @@ export class Glyphs {
 	/**
 	 * The number of columns a wrapped row fills, tabs expanded.
 	 *
-	 * Short of `cols` whenever the row ended early, and its full display
-	 * width otherwise. Rows outside the grid report `0`.
-	 *
-	 * Use this to paint a row to its end rather than to the grid edge: a
-	 * highlight's last row, an underline, a background bar.
+	 * Use this to end a highlight at the text's width. Rows outside the
+	 * grid report zero.
 	 *
 	 * @example
 	 * ```ts
@@ -469,14 +443,8 @@ export class Glyphs {
 	/**
 	 * The cells a source range covers, as runs of columns per row.
 	 *
-	 * The half-open range `[start, end)` becomes one {@link CellSpan} per
-	 * wrapped row it touches, ordered by row. Escapes and tabs inside the
-	 * range do not split a run, and a range that draws nothing returns no
-	 * spans.
-	 *
-	 * This is the shape highlights want: a search match, a selection, a
-	 * syntax span, an underline -- one span to shade per row, even when the
-	 * range wraps.
+	 * Returns one {@link CellSpan} per row containing a mapped cell. Escapes
+	 * and tabs inside a range do not split a run.
 	 *
 	 * @example
 	 * ```ts
@@ -532,15 +500,8 @@ export class Glyphs {
 	/**
 	 * A copy of the grid with some or all cells replaced.
 	 *
-	 * `fn` is called with each cell's current value and its position, and
-	 * returns the value to draw instead. Only cells inside `within` are
-	 * visited; omit it to map every cell. The original grid is left alone,
-	 * so a compiled grid can be shared and derived from freely.
-	 *
-	 * Because cells keep their positions, the copy answers every position
-	 * query exactly as the original does: use it to draw overlay state --
-	 * a cursor inversion, a selection shade, a dimmed region, a cleared
-	 * area -- without disturbing the grid you compiled.
+	 * The copy retains the original text, anchors, and position mappings.
+	 * Use {@link unpackCell} and {@link packCell} to transform cell fields.
 	 *
 	 * @example
 	 * ```ts

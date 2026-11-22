@@ -15,7 +15,7 @@ uniform int u_rows;
 uniform int u_cols;
 uniform int u_canvas_rows;
 uniform int u_canvas_cols;
-uniform vec3 u_palette[16];
+uniform vec3 u_palette[18];
 uniform sampler2D u_texture;
 
 out vec2 v_cell_coord;
@@ -106,7 +106,7 @@ Glyph getGlyph(int dim, float lum) {
 	int glyph_idx = clamp(int(12.0 * lum), 0, 11);
 	glyph.char_code = glyphs[glyph_idx];
 	glyph.fg_idx = fgs[layer];
-	glyph.bg_idx = 0;
+	glyph.bg_idx = 17;
 
 	return glyph;
 }
@@ -116,11 +116,10 @@ Glyph getBgGlyph(int dim, float lum) {
 	int glyphs[12] = int[](0, 46, 45, 44, 58, 59, 61, 33, 42, 35, 36, 64);
 
 	int fgs[3] = int[](dim, dim + 8, 15);
-	int bgs[3] = int[](0, dim, dim + 8);
+	int bgs[3] = int[](17, dim, dim + 8);
 
 	int layer = clamp(int(lum * 3.0), 0, 2);
 
-	// check if dimension is white
 	if (dim == 7) {
 		if (layer > 0) {
 			// reverse the order of the glyphs
@@ -129,7 +128,7 @@ Glyph getBgGlyph(int dim, float lum) {
 		}
 
 		fgs = int[](7, 0, 8);
-		bgs = int[](0, 7, 15);
+		bgs = int[](17, 7, 15);
 	}
 
 	Glyph glyph;
@@ -167,7 +166,6 @@ void main() {
 	v_tex_uv_coord = vec2(float(col) / float(u_cols),
 			  float(row) / float(u_rows));
 
-	// position needs to be in [-1.0, 1.0]
 	float ndc_x = 2.0 * float(u_col + col) / float(u_canvas_cols) - 1.0;
 	float ndc_y = -2.0 * float(u_row + row) / float(u_canvas_rows) + 1.0;
 
@@ -175,13 +173,10 @@ void main() {
 
 	f_mode = a_mode;
 
-	// sample mode
 	if (f_mode == SAMPLE_MODE) {
-		// no more work to do
 		return;
 	}
 
-	// dithered glyphs mode
 
 	vec2 origin_uv_coord = vec2(float(origin_col) / float(u_cols),
 				    float(origin_row) / float(u_rows));
@@ -190,7 +185,6 @@ void main() {
 	vec4 samp = texture(u_texture, origin_uv_coord + 0.5 * full_uv_cell);
 	vec3 colour = samp.rgb;
 
-	// dithering
 	float bayer[16] = float[](
 		0.0, 0.5, 0.125, 0.625,
 		0.75, 0.25, 0.875, 0.375,

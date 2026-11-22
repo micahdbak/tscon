@@ -1,17 +1,20 @@
 import { describe, expect, test } from "bun:test";
 
+import { packCell, unpackCell } from "./cell.ts";
 import { Glyphs } from "./glyphs.ts";
 import { Wrap } from "./wrap.ts";
 
 const B = "\\";
 
-const hex = (glyphs: { data: Uint16Array }): string =>
+const hex = (glyphs: { data: Uint32Array }): string =>
 	[...glyphs.data].map((cell) => cell.toString(16)).join(",");
 
 describe("Glyphs compilation", () => {
-	test("packs characters as fg/bg high byte plus CP437 char code", () => {
-		// default white-on-black: colour byte f0
-		expect(hex(new Glyphs("ab", 2))).toBe("f061,f062");
+	test("packs foreground, background, and glyph into three low bytes", () => {
+		// the top byte is reserved and remains zero
+		expect(hex(new Glyphs("ab", 2))).toBe("101161,101162");
+		expect(packCell(65, 16, 17)).toBe(0x101141);
+		expect(unpackCell(0x101141)).toEqual({ char_code: 65, foreground: 16, background: 17 });
 	});
 
 	test("an empty grid comes back for zero columns", () => {
@@ -27,7 +30,7 @@ describe("Glyphs compilation", () => {
 		const glyphs = new Glyphs(`${B}a0{Foo|bar}Foo`, 10);
 
 		expect(glyphs.anchors[0]).toEqual([{ options: "Foo|bar", row: 0, col: 0, index: 12 }]);
-		expect(hex(glyphs)).toBe("f046,f06f,f06f,0,0,0,0,0,0,0");
+		expect(hex(glyphs)).toBe("101146,10116f,10116f,0,0,0,0,0,0,0");
 	});
 
 	test("anchor payloads: absent and empty both read as null", () => {
@@ -39,7 +42,7 @@ describe("Glyphs compilation", () => {
 		const glyphs = new Glyphs(`x${B}a0{Foo`, 10);
 
 		expect(glyphs.anchors[0]).toBeUndefined();
-		expect(hex(glyphs)).toBe("f078,f05c,f061,f030,f07b,f046,f06f,f06f,0,0");
+		expect(hex(glyphs)).toBe("101178,10115c,101161,101130,10117b,101146,10116f,10116f,0,0");
 	});
 
 	test("a payload must close on its own line", () => {
@@ -54,30 +57,34 @@ describe("Glyphs compilation", () => {
 
 	test("colours clamp to the palette; capitals select the bright half", () => {
 		// \f1 dark, \F9 clamps to bright white, \b2 dark background
-		expect(hex(new Glyphs(`${B}f1${B}F9${B}b2xB`, 2))).toBe("f278,f242");
-		expect(hex(new Glyphs(`${B}f9a`, 1))).toBe("7061");
+		expect(hex(new Glyphs(`${B}f1${B}F9${B}b2xB`, 2))).toBe("f0278,f0242");
+		expect(hex(new Glyphs(`${B}f9a`, 1))).toBe("71161");
 	});
 
 	test("colour state carries across wrapped rows", () => {
 		const glyphs = new Glyphs(`${B}f1aa bb`, 2, { wrap: Wrap.WORD });
 
 		// both rows keep the dark-blue foreground
-		expect(hex(glyphs)).toBe("1061,1061,1062,1062");
+		expect(hex(glyphs)).toBe("11161,11161,11162,11162");
 	});
 
 	test("tabs advance to the next tab stop without emitting", () => {
-		expect(hex(new Glyphs("\tab", 10))).toBe("0,0,0,0,0,0,0,0,f061,f062");
+		expect(hex(new Glyphs("\tab", 10))).toBe("0,0,0,0,0,0,0,0,101161,101162");
 	});
 
-	test("a space on the all-black colour byte is omitted; a default one paints", () => {
-		// colour byte 0 (explicit black fg) leaves the cell zero, which the
-		// shader clips; the default white-on-black space paints a quad
-		expect(hex(new Glyphs(`${B}f0a `, 2))).toBe("61,0");
-		expect(hex(new Glyphs("a ", 2))).toBe("f061,f020");
+	test("theme spaces paint while untouched cells remain zero", () => {
+		expect(hex(new Glyphs("a ", 3))).toBe("101161,101120,0");
+	});
+
+	test("keeps each colour independent and restores both with format clear", () => {
+		const glyphs = new Glyphs(`A${B}F4B${B}b0C${B}cD${B}f0${B}b0E`, 5);
+
+		expect(hex(glyphs)).toBe("101141,c1142,c0043,101144,45");
+		expect(hex(new Glyphs(`${B}b0A`, 1))).toBe("100041");
 	});
 
 	test("characters outside CP437 render as their fallback", () => {
-		expect(hex(new Glyphs("é", 1))).toBe("f082");
+		expect(hex(new Glyphs("é", 1))).toBe("101182");
 	});
 
 	test("anchors survive word wrap at the next row", () => {
@@ -123,7 +130,7 @@ describe("Glyphs compilation", () => {
 		const glyphs = new Glyphs(source, 10, { raw: true });
 
 		expect(hex(glyphs)).toBe(
-			"f078,f05c,f066,f031,f079,f05c,f061,f030,f07a,0",
+			"101178,10115c,101166,101131,101179,10115c,101161,101130,10117a,0",
 		);
 		expect(glyphs.anchors[0]).toBeUndefined();
 
@@ -308,7 +315,7 @@ describe("Glyphs positions", () => {
 	});
 
 	test("mapCells transforms cells and preserves everything else", () => {
-		const glyphs = new Glyphs(`${B}a0{Foo|bar}foo bar`, 10);
+		const glyphs = new Glyphs(`${B}f1${B}a0{Foo|bar}foo bar`, 10);
 		const original = glyphs.data.slice();
 
 		const inverted = glyphs.mapCells((cell, row, col) => {
@@ -316,11 +323,11 @@ describe("Glyphs positions", () => {
 				return cell;
 			}
 
-			// swap the fg and bg nibbles
-			const fg = (cell >> 12) & 0xf;
-			const bg = (cell >> 8) & 0xf;
+			// swap the foreground and background bytes
+			const fg = (cell >>> 16) & 0xff;
+			const bg = (cell >>> 8) & 0xff;
 
-			return (bg << 12) | (fg << 8) | (cell & 0xff);
+			return (bg << 16) | (fg << 8) | (cell & 0xff);
 		});
 
 		// data changed where mapped

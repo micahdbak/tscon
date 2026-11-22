@@ -9,14 +9,16 @@ import {
 import type { Rect } from "./rect.ts";
 
 /**
- * Renders a source texture as glyphs onto a {@link Canvas}.
+ * Draw a texture directly or as coloured characters on a {@link Canvas}.
  *
- * `Renderer` draws a grid of {@link TexGlyphs} cells, sampling an
- * application-provided texture per cell according to each cell's
- * {@link TexGlyphMode}. An application renders into a texture (e.g. a
- * framebuffer object) and then calls {@link draw} with a matching
- * {@link TexGlyphs} grid to draw that texture directly or as dithered
- * coloured characters.
+ * Use {@link textureGlyphs} to prepare the sampling grid for {@link draw}.
+ *
+ * @example
+ * ```ts
+ * const renderer = new Renderer(canvas);
+ * const grid = textureGlyphs(12, 24, TexGlyphMode.GLYPHS);
+ * renderer.draw(grid, texture, { row: 0, col: 0, rows: 12, cols: 24 });
+ * ```
  */
 export class Renderer {
 	private readonly gl_program: WebGLProgram;
@@ -39,8 +41,12 @@ export class Renderer {
 	public use_user_font: boolean;
 
 	/**
-	 * Initializes the renderer for use.
-	 * Listens for `"resize"` events from the canvas.
+	 * Create a renderer that follows the canvas grid size.
+	 *
+	 * @example
+	 * ```ts
+	 * const renderer = new Renderer(canvas);
+	 * ```
 	 *
 	 * @param canvas  The canvas to draw into.
 	 */
@@ -92,11 +98,7 @@ export class Renderer {
 
 		gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
 
-		// every vertex in the VBO is a 32-bit integer split like so:
-		// [ row    | mode   | col     ]
-		// [ 8-bits | 8-bits | 16-bits ]
-
-		// a_row
+		// textureGlyphs packs the row and mode above the 16-bit column.
 		gl.vertexAttribIPointer(
 			attributes.row,
 			1,
@@ -107,7 +109,6 @@ export class Renderer {
 		gl.vertexAttribDivisor(attributes.row, 1);
 		gl.enableVertexAttribArray(attributes.row);
 
-		// a_mode
 		gl.vertexAttribIPointer(
 			attributes.mode,
 			1,
@@ -118,7 +119,6 @@ export class Renderer {
 		gl.vertexAttribDivisor(attributes.mode, 1);
 		gl.enableVertexAttribArray(attributes.mode);
 
-		// a_col
 		gl.vertexAttribIPointer(
 			attributes.col,
 			1,
@@ -151,11 +151,9 @@ export class Renderer {
 	 * Draw a {@link TexGlyphs} grid sampling `texture` into a region of the
 	 * canvas.
 	 *
-	 * `tglyphs.rows`/`cols` must match `dst.rows`/`cols`; otherwise the
-	 * draw is skipped. `dst` is in canvas cell coordinates and may extend
-	 * beyond the canvas; the shader clips via NDC. Use a `tglyphs` grid
-	 * sized to the texture's aspect so the texture isn't distorted. The
-	 * canvas's current palette is applied each draw.
+	 * The destination must match the grid dimensions. It can extend off
+	 * canvas, with clipping that preserves the source texture mapping.
+	 * The destination's pixel aspect ratio sets the drawn image's aspect.
 	 *
 	 * @example
 	 * ```ts
@@ -194,20 +192,16 @@ export class Renderer {
 			);
 		}
 
-		// set destination information uniforms
 		gl.uniform1i(this.uniforms.row, dst.row);
 		gl.uniform1i(this.uniforms.col, dst.col);
 		gl.uniform1i(this.uniforms.rows, tglyphs.rows);
 		gl.uniform1i(this.uniforms.cols, tglyphs.cols);
-		// set vertex buffer data to provided texture glyphs
 		gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
 		gl.bufferData(gl.ARRAY_BUFFER, tglyphs.data, gl.DYNAMIC_DRAW);
 
-		// bind and activate bitmap font
 		gl.activeTexture(gl.TEXTURE0);
 		gl.bindTexture(gl.TEXTURE_2D, this.canvas.bitmap_font);
 
-		// bind and activate provided texture
 		gl.activeTexture(gl.TEXTURE1);
 		gl.bindTexture(gl.TEXTURE_2D, texture);
 
@@ -220,7 +214,6 @@ export class Renderer {
 			gl.bindTexture(gl.TEXTURE_2D, user_font);
 		}
 
-		// draw the glyphs covered by the provided texture glyphs
 		gl.bindVertexArray(this.vao);
 		gl.drawArraysInstanced(
 			gl.TRIANGLES,

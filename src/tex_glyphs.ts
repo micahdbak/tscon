@@ -2,18 +2,11 @@
  * How a texture is drawn as cells, chosen per grid by
  * {@link textureGlyphs} and drawn by {@link Renderer.draw}.
  *
- * - `SAMPLE`    -- draw the texture as it is, so the region looks like the
- *                  texture. This is the photographic mode.
- * - `GLYPHS`    -- draw the texture as coloured characters on a black
- *                  background. Softer and less busy than `BG_GLYPHS`, and
- *                  the safe choice when text is drawn over the region.
- * - `BG_GLYPHS` -- like `GLYPHS`, but the character backgrounds carry
- *                  colour too. Brighter and more faithful; use it when
- *                  nothing is drawn on top of the region.
- * - `MIX`       -- alternate `SAMPLE` and `GLYPHS` cell by cell, in a
- *                  checkerboard.
- * - `ROWS`      -- alternate `SAMPLE` and `GLYPHS` row by row.
- * - `COLS`      -- alternate `SAMPLE` and `GLYPHS` column by column.
+ * - `SAMPLE` displays the original texture.
+ * - `GLYPHS` draws coloured characters on the theme background.
+ * - `BG_GLYPHS` selects both foreground and background from the texture.
+ * - `MIX`, `ROWS`, and `COLS` alternate `SAMPLE` and `GLYPHS` by cell,
+ *   row, or column.
  *
  * @example
  * ```ts
@@ -33,12 +26,7 @@ export enum TexGlyphMode {
 }
 
 /**
- * A description of how to draw a texture as cells: one entry per cell saying
- * which part of the texture it shows and how, built by
- * {@link textureGlyphs} and drawn by {@link Renderer.draw}.
- *
- * The grid must be the same size as the region it is drawn into, so size it
- * to the area the texture should fill.
+ * A texture sampling grid from {@link textureGlyphs} for {@link Renderer.draw}.
  *
  * @example
  * ```ts
@@ -60,8 +48,6 @@ export type TexGlyphs = {
 	cols: number;
 };
 
-// MIX/ROWS/COLS alternate cells between SAMPLE and GLYPHS by their
-// pattern; the other modes apply to every cell as-is
 function cellMode(mode: TexGlyphMode, row: number, col: number): TexGlyphMode {
 	switch (mode) {
 		case TexGlyphMode.MIX:
@@ -82,13 +68,6 @@ function cellMode(mode: TexGlyphMode, row: number, col: number): TexGlyphMode {
  * Build a {@link TexGlyphs} grid of `rows` by `cols` cells that draws a
  * texture in the given {@link TexGlyphMode}.
  *
- * Size the grid to the region you want the texture to fill -- the whole
- * canvas, or part of it -- and pass it to {@link Renderer.draw} with the
- * texture. A grid only fits a region of exactly the same size.
- *
- * The `MIX`, `ROWS`, and `COLS` modes pick between `SAMPLE` and `GLYPHS` per
- * cell, following their pattern.
- *
  * @example
  * ```ts
  * import { TexGlyphMode, textureGlyphs } from "@micahdb/tscon";
@@ -100,8 +79,8 @@ function cellMode(mode: TexGlyphMode, row: number, col: number): TexGlyphMode {
  * const inset = textureGlyphs(24, 48, TexGlyphMode.SAMPLE);
  * ```
  *
- * @param rows  Height of the grid in cells.
- * @param cols  Width of the grid in cells.
+ * @param rows  Height in cells. The packed row index supports up to 256 rows.
+ * @param cols  Width in cells. The packed column index supports up to 65536 columns.
  * @param mode  How the texture is drawn in each cell.
  * @returns     The grid, ready for {@link Renderer.draw}.
  */

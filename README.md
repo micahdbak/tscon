@@ -1,12 +1,8 @@
 # @micahdb/tscon
 
-WebGL 2.0 text-mode graphics in TypeScript.
-
-tscon draws a `<canvas>` as a grid of character cells. Text is written once,
-compiled into that grid, and drawn with a single GPU call, so a web page can
-be laid out, styled, and interacted with as plain characters. It also renders
-live textures as characters, which makes photographic and 3D content sit
-inside the same grid.
+Render text and textures on a WebGL2 canvas arranged as a grid of character
+cells. Text uses the CP437 character set and inline escapes for colours and
+application-defined anchors.
 
 ## Install
 
@@ -16,264 +12,132 @@ bun add @micahdb/tscon
 npm install @micahdb/tscon
 ```
 
-## Usage
+## Draw a frame
+
+Give the canvas a size in CSS. `Canvas.from` creates the browser host and throws
+if WebGL2 is unavailable.
 
 ```ts
 import { Canvas, Glyphs, Terminal } from "@micahdb/tscon";
 
 const canvas = Canvas.from(document.querySelector("canvas")!);
 const terminal = new Terminal(canvas);
-
-// compile the text once, at the width you want it to fill
 const glyphs = new Glyphs("Hello, tscon!", canvas.cols);
+const region = { row: 0, col: 0, rows: glyphs.rows, cols: glyphs.cols };
 
-// draw: clear the frame, blit the grid, present it
 canvas.clear();
 terminal.clear();
-terminal.blit(
-    glyphs,
-    { row: 0, col: 0, rows: glyphs.rows, cols: glyphs.cols },
-    { row: 0, col: 0, rows: glyphs.rows, cols: glyphs.cols },
-);
+terminal.blit(glyphs, region, region);
 terminal.draw();
 ```
 
-Everything is measured in cells, never pixels: `canvas.rows` by `canvas.cols`
-cells, roughly 8x16 CSS pixels each. Sizes come from the canvas, and regions
-are `{ row, col, rows, cols }`.
+Grid positions are zero-based. Regions give the top-left cell and size as
+`{ row, col, rows, cols }`. The default grid fits whole multiples of 8x16 device
+pixels per cell and leaves unused space on the right and bottom. Pass
+`{ stretch: true }` to fill the canvas with potentially fractional cell sizes.
+Canvases too small for one 8x16 cell use the full-canvas grid.
 
-## Text
+Reuse compiled glyphs until the text or available width changes. Listen for
+`"resize"` to rebuild layouts when `canvas.rows` or `canvas.cols` changes.
 
-Text is a plain string with escape sequences for styling and for marking
-positions:
+## Text and anchors
 
 | Escape | Meaning |
 | --- | --- |
-| `\fX` / `\FX` | foreground, dark / bright palette index `X` |
-| `\bX` / `\BX` | background, dark / bright palette index `X` |
-| `\aX` / `\aX{options}` | an anchor in group `X` (0-9), with optional payload |
-| `\\` | a literal backslash |
+| `\fX` / `\FX` | Set foreground to dark / bright palette colour `X` (0-7). |
+| `\bX` / `\BX` | Set background to dark / bright palette colour `X` (0-7). |
+| `\c` | Restore both theme colours. |
+| `\aX` / `\aX{options}` | Mark the next visible cell in group `X` (0-9). |
+| `\\` | Display a backslash. |
 
-A newline starts a new line, `\` before a newline joins two lines, and a tab
-advances to the next multiple of `TAB_WIDTH`. Raw mode
-(`new Glyphs(text, cols, { raw: true })`) renders escapes literally; tabs still
-advance to their next tab stop.
+A backslash immediately before a newline joins the lines. Tabs advance to the
+next tab stop. `Glyphs` uses word wrap by default. Pass `Wrap.HARD` to break at
+the column limit, `Wrap.TRUNCATE` to discard overflow, or `{ raw: true }` to
+show escape syntax literally. Use `textToLines` when you only need the wrapped
+text.
 
-`Glyphs` compiles text for a given width. The grid it produces can be blitted
-directly, and can also answer where things ended up:
+Anchors take no columns. Their payload is application data and its closing brace
+must be on the same line. Use the compiled positions to place links, images, or
+other overlays. Source indices are offsets in the original JavaScript string,
+including escapes.
 
 ```ts
-import { Glyphs, Wrap } from "@micahdb/tscon";
+import { Glyphs } from "@micahdb/tscon";
 
-const g = new Glyphs("Click \\a0{here|#}here", 40);
+const glyphs = new Glyphs("Click \\a0{here|#}here", 40);
 
-g.renderedCell(17);     // { row: 0, col: 6 }: where the "h" draws
-g.renderedCell(6);      // null: index 6 is inside the anchor
-g.cursorCell(6);        // { row: 0, col: 6 }: a cursor here shows on the "h"
-g.cursorIndex(0, 9);    // 20: the source character under that cell
-g.spansFor(17, 21);     // [{ row: 0, from: 6, to: 10 }]
-g.rowCols(0);           // 10: "Click here"
-
-const hard = new Glyphs("long text", 4, { wrap: Wrap.HARD });
-hard.wrappedText;       // ["long", " tex", "t"]
+glyphs.anchors[0]![0]!;  // { options: "here|#", row: 0, col: 6, index: 17 }
+glyphs.renderedCell(17); // { row: 0, col: 6 }
+glyphs.cursorIndex(0, 9); // 20
+glyphs.spansFor(17, 21); // [{ row: 0, from: 6, to: 10 }]
 ```
 
-`col` indices are positions in the source string, escapes included; `row` and
-`col` from the position methods are cells in the compiled grid.
+## Colours and cell data
 
-## Anchors
+A `Palette` holds RGB byte triples indexed by `Colour`. Entries 0-15 are the
+explicit colours. Unstyled text starts with `Colour.FG` (16) and `Colour.BG`
+(17), and `Canvas.clear()` uses `Colour.BG`. Foreground and background escapes
+change their channels independently. Pass `{ palette }` to `Canvas.from` or call
+`canvas.setPalette(palette)` at runtime. Omitted entries use `DEFAULT_COLOURS`.
 
-An anchor marks a cell for the application without occupying space of its
-own. `glyphs.anchors[group]` lists them, each with the payload and the cell of
-the character that follows it. What a group means is up to you: links,
-inline images, headings, hit targets.
+`Glyphs.data` holds one 32-bit word per cell. Use `packCell` and `unpackCell` to
+read or write the character and colour indices. Use `Glyphs.mapCells` to derive
+a grid for an overlay while keeping its source positions and anchors.
+
+An all-zero word draws nothing. A space with a background colour paints that
+background. Return `0` from `mapCells` to make a cell transparent.
+
+## Textures and fonts
+
+Use `textureGlyphs(rows, cols, mode)` to prepare a grid for `Renderer.draw`.
+Choose `TexGlyphMode.SAMPLE` to display the source image, `GLYPHS` for coloured
+characters on the theme background, or `BG_GLYPHS` to colour both parts of the
+cell. The destination must match the grid's size. Pass the full destination even
+when it extends off canvas so clipping preserves the texture mapping.
 
 ```ts
-const g = new Glyphs("\\a0{Docs|#docs}Docs", 20);
-const link = g.anchors[0]![0]!;
-// { options: "Docs|#docs", row: 0, col: 0, index: 15 }
-```
-
-## Textures
-
-`Renderer` draws a texture into a region as cells, either as the texture
-itself or converted into coloured characters:
-
-```ts
-import { Renderer, TexGlyphMode, textureGlyphs } from "@micahdb/tscon";
+import { loadTexture, Renderer, TexGlyphMode, textureGlyphs } from "@micahdb/tscon";
 
 const renderer = new Renderer(canvas);
-const grid = textureGlyphs(24, 48, TexGlyphMode.BG_GLYPHS);
+const image = await loadTexture(canvas.gl, "/images/portrait.jpg");
+const grid = textureGlyphs(12, 24, TexGlyphMode.SAMPLE);
 
-renderer.draw(grid, someWebGLTexture, { row: 0, col: 0, rows: 24, cols: 48 });
+renderer.draw(grid, image, { row: 0, col: 0, rows: 12, cols: 24 });
 ```
 
-Textures composite under text: blank cells are transparent, so text stays
-readable over a rendered scene.
+Draw background textures after `canvas.clear()` and before `terminal.draw()`. If
+an offscreen pass changes the WebGL viewport, restore the previous viewport
+before drawing the grid.
 
-## Escape hatch
+The built-in Modern DOS bitmap uses nearest-neighbour sampling. For a custom
+font, use `renderCp437` to generate an atlas and upload it as a texture. Assign
+it to `canvas.user_font` and set `use_user_font = true` on each terminal or
+renderer that uses it. Custom glyphs are anti-aliased. CP437 codes 176-223 use
+the built-in bitmap in either mode.
 
-`Glyphs.mapCells` derives an altered copy of a compiled grid -- a cursor
-inversion, a selection shade, a cleared region -- without touching the
-original or losing its positions:
+## Input and headless tests
 
-```ts
-// blank a strip, so whatever is drawn beneath it shows through
-const cleared = glyphs.mapCells(
-    () => 0,
-    { row: 2, col: 0, rows: 1, cols: 10 },
-);
-```
+`Canvas` converts pointer positions to cells and emits `"wheel"` in whole rows.
+Call `event.detail.prevent_default()` in a `"keydown"` listener to intercept
+built-in keyboard scrolling. Call `canvas.dispose()` to remove host listeners.
 
-## Palette
+Use `new Canvas(host, gl)` to inject a host and context. For tests, combine
+`TestCanvasHost` with `createHeadlessGL2()` and exercise the real terminal or
+renderer. Assert on compiled cells, events, or draw calls. Pixel checks need a
+WebGL2 browser.
 
-The terminal uses a 16-colour palette made of 8-bit `[R, G, B]` triples.
-`DEFAULT_COLOURS` is the default, ordered by `Colour`. Pass a partial or complete
-palette when constructing a canvas, or replace it at runtime:
-
-```ts
-import { Canvas, Colour, DEFAULT_COLOURS, Palette } from "@micahdb/tscon";
-
-const palette = new Palette(DEFAULT_COLOURS);
-palette.colours[Colour.RED] = [0xff, 0x00, 0x00];
-
-const canvas = Canvas.from(element, { palette });
-
-// replace it later; missing entries fall back to the default colours
-canvas.setPalette(new Palette([
-    [0x08, 0x08, 0x08],
-    [0xff, 0x00, 0x00],
-]));
-```
-
-Channels outside `0`-`255` are clamped and rounded. `Terminal` and `Renderer`
-apply the canvas's current palette on every draw, so changes take effect on
-the next frame.
-
-## Hosts
-
-`Canvas` reads size and input from a `CanvasHost` and draws through an
-injected WebGL2 context. `Canvas.from(element)` creates the normal browser
-host and context for you:
-
-```ts
-import { Canvas } from "@micahdb/tscon";
-
-const canvas = Canvas.from(document.querySelector("canvas")!);
-```
-
-It throws when a WebGL2 context cannot be acquired.
-
-Use the constructor when you need to supply the host or context yourself:
-
-```ts
-import { Canvas, WebCanvasHost } from "@micahdb/tscon";
-
-const host = new WebCanvasHost(canvasElement);
-const gl = canvasElement.getContext("webgl2")!;
-const canvas = new Canvas(host, gl);
-```
-
-`WebCanvasHost` owns the element's DPR sizing, focus, pointer capture, and
-native listener wiring. `Canvas` itself owns the cell grid, WebGL resources,
-input state, and events. Keyboard events are dispatched before the built-in
-key scrolling; call `event.detail.prevent_default()` to suppress both the
-browser default and that scrolling. Call `canvas.dispose()` to remove host
-listeners.
-
-## Testing
-
-tscon tests run headlessly with Bun. `TestCanvasHost` supplies virtual DOM
-size, focus, pointer, wheel, keyboard, and resize events, while
-`createHeadlessGL2()` supplies a WebGL2-shaped no-op context. The real
-`Canvas`, `Terminal`, and `Renderer` can therefore be constructed and used
-without a browser or GPU:
-
-```ts
-import { describe, expect, test } from "bun:test";
-import {
-    Canvas,
-    TestCanvasHost,
-    Terminal,
-    createHeadlessGL2,
-} from "@micahdb/tscon";
-
-const host = new TestCanvasHost({ css_width: 800, css_height: 480 });
-const canvas = new Canvas(host, createHeadlessGL2());
-const terminal = new Terminal(canvas);
-
-const wheel: number[] = [];
-canvas.addEventListener("wheel", (event) => {
-    wheel.push((event as CustomEvent<{ rows: number }>).detail.rows);
-});
-
-describe("canvas input", () => {
-    test("j emits one wheel row when focused", () => {
-        host.focus();
-        host.keyDown("j");
-
-        expect(wheel).toEqual([1]);
-    });
-
-    test("pointer positions land on cells", () => {
-        host.pointerAtCell(2, 3, canvas.rows, canvas.cols);
-
-        expect(canvas.mouseAt(2, 3, 1, 1)).toBe(true);
-    });
-
-    test("press and release produces a click", () => {
-        host.pointerMove(40, 80);
-        host.pointerDown(40, 80);
-        host.pointerUp(40, 80);
-
-        expect(canvas.mouse_click).toBe(true);
-    });
-});
-```
-
-Inject exact situations through the test host:
-
-- `resize(cssWidth, cssHeight, dpr?)`
-- `focus()` / `blur()`
-- `pointerMove`, `pointerAtCell`, `pointerDown`, `pointerUp`,
-  `pointerCancel`, `pointerLeave`
-- `wheel(deltaY, deltaMode?)`
-- `keyDown` / `keyUp`
-
-`TestCanvasHost.default_prevented` reports whether the last key event called
-`prevent_default`. The headless context is intentionally a no-op: tests should
-assert on `Canvas` state, emitted events, and compiled `Glyphs`, not on GPU
-pixels. Use a real browser for visual checks.
-
-Run the checks in this order:
+## Development
 
 ```sh
-bun test                 # the whole suite
-bun test src/canvas.test.ts
-bun test src/glyphs.test.ts
+bun install
+bun test
 bun run typecheck
 bun run lint
 bun run build
 ```
 
-## Development
-
-This project uses [Bun](https://bun.sh) as its primary toolchain (installs,
-scripts, and publishing) with the TypeScript compiler for type-checking and
-`dist/` emission.
-
-```sh
-bun install        # install dev dependencies
-bun run shaders    # regenerate src/shaders.ts from shaders/
-bun test           # run the test suite
-bun run typecheck  # type-check only
-bun run lint       # lint
-bun run build      # type-check + emit dist/ (JS + .d.ts)
-```
-
-Source files import each other with explicit `.ts` extensions so they run
-natively under Bun; the build rewrites those specifiers to `.js` in the
-published output via `rewriteRelativeImportExtensions`.
+Run `bun run shaders` after changing `shaders/` to regenerate `src/shaders.ts`.
+The build emits JavaScript and declarations in `dist/`.
 
 ## License
 

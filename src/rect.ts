@@ -1,10 +1,5 @@
 /**
- * A rectangular region of a terminal grid, expressed in cell coordinates.
- *
- * A `Rect` describes a region by its top-left origin (`row`, `col`) and its
- * size in cells (`rows`, `cols`). It is used throughout tscon to describe both
- * source regions of glyph data and destination regions on the canvas when
- * blitting.
+ * A region of a terminal grid for {@link Terminal.blit} or {@link Renderer.draw}.
  *
  * @example
  * ```ts
@@ -15,12 +10,12 @@
  * ```
  */
 export type Rect = {
-	/** Row index (y) of the top-left cell of the region. */
+	/** Top row, zero-based. */
 	row: number;
-	/** Column index (x) of the top-left cell of the region. */
+	/** Left column, zero-based. */
 	col: number;
-	/** Height of the region, in cells (rows). */
+	/** Height in rows. */
 	rows: number;
-	/** Width of the region, in cells (columns). */
+	/** Width in columns. */
 	cols: number;
 };

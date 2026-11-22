@@ -38,8 +38,11 @@ function lastPalette(gl: PaletteGL): number[] {
 }
 
 describe("colour palette", () => {
-	test("DEFAULT_COLOURS has 16 colours", () => {
-		expect(DEFAULT_COLOURS).toHaveLength(16);
+	test("theme defaults are separate from black and white", () => {
+		expect(DEFAULT_COLOURS).toHaveLength(18);
+		expect(DEFAULT_COLOURS[0]).toEqual([0x25, 0x25, 0x30]);
+		expect(DEFAULT_COLOURS[16]).toEqual([0xcd, 0xcd, 0xcd]);
+		expect(DEFAULT_COLOURS[17]).toEqual([0x14, 0x14, 0x15]);
 	});
 
 	test("Palette copies colours and clamps them when converting", () => {
@@ -50,7 +53,7 @@ describe("colour palette", () => {
 		]);
 		const floats = palette.toFloats();
 
-		expect(floats).toHaveLength(48);
+		expect(floats).toHaveLength(54);
 		expect(floats[0]).toBe(1);
 		expect(floats[1]).toBe(0);
 		expect(floats[2]).toBe(0);

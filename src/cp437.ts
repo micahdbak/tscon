@@ -1,27 +1,7 @@
-/*
-╔═══════════ Code Page 437 ══════════╗
-║                                    ║
-║   ☺☻♥♦♣♠•◘○◙♂♀♪♫☼►◄↕‼¶§▬↨↑↓→←∟↔▲▼  ║
-║   !"#$%&'()*+,-./0123456789:;<=>?  ║
-║  @ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_  ║
-║  `abcdefghijklmnopqrstuvwxyz{|}~⌂  ║
-║  ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥₧ƒ  ║
-║  áíóúñÑªº¿⌐¬½¼¡«»░▒▓│┤╡╢╖╕╣║╗╝╜╛┐  ║
-║  └┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀  ║
-║  αßΓπΣσµτΦΘΩδ∞φε∩≡±≥≤⌠⌡÷≈°∙·√ⁿ²■   ║
-║                                    ║
-╚════════════════════════════════════╝
-*/
-
 /**
  * The 256 characters of IBM Code Page 437, as a string indexed by code.
  *
- * Index 0 is a blank (the CP437 NUL is unused) and index 255 is also treated
- * as blank; all other indices 1..254 map to the corresponding CP437 glyph.
- * This is the character set tscon's font covers: text compiled by
- * {@link Glyphs} draws these glyphs, and anything else draws blank.
- *
- * NOTE: chars at 0 and 255 are ignored.
+ * Indices 0 and 255 are blank. The remaining indices match {@link Glyphs}.
  */
 export const CP437_CHARS = `\
  ☺☻♥♦♣♠•◘○◙♂♀♪♫☼►◄↕‼¶§▬↨↑↓→←∟↔▲▼\
@@ -45,10 +25,8 @@ for (let i = 1; i < 255; i++) {
 
 const CP437_MAX_CODE_POINT = max_code_point;
 
-// map from any character code point <= CP437_MAX_CODE_POINT to index in CP437
 const CP437_MAP = new Uint8Array(CP437_MAX_CODE_POINT + 1);
 
-// populate CP437_MAP
 for (let i = 1; i < 255; i++) {
 	const code_point = CP437_CHARS.codePointAt(i)!;
 	CP437_MAP[code_point] = i;
@@ -104,27 +82,13 @@ function fitsCell(box: GlyphBox, width: number, above: number, below: number): b
 /**
  * Render the CP437 character set onto a 2D canvas for use as a font texture.
  *
- * Loads the given `font` CSS string via the Font Loading API, then paints all
- * 255 CP437 glyphs into a 32-column x 8-row grid on the supplied `canvas`
- * (white on black). Box-drawing characters are replaced with `"@"`
- * placeholders so they are not double-drawn; tscon's built-in bitmap font is
- * used for those.
+ * The atlas has 32 columns and 8 rows and stores white glyphs on black.
+ * Cell dimensions depend on measured glyphs and can vary by platform.
+ * Glyphs that exceed the cell bounds are scaled to fit. The atlas uses
+ * placeholders for codes 176-223 because the terminal draws those from
+ * the built-in bitmap.
  *
- * Cells are as wide as the `font`'s advance and at least twice as tall, but
- * grow taller when the glyphs paint outside that box, and the ink is centred
- * in the cell. Characters the `font` does not cover are painted by a fallback
- * font, whose ink can reach wider, higher, or lower than the `font`'s own
- * metrics: a glyph that would not land inside its cell is scaled down and
- * recentred until it does, so the atlas holds every glyph whole rather than
- * cropping any of them.
- *
- * The grid is always 32 columns by 8 rows, whichever fonts end up painting it;
- * only the cell size varies. Expect the atlas' pixel dimensions to differ
- * between platforms when a fallback font is involved.
- *
- * The resulting canvas is intended to be captured (e.g. via `toDataURL` or a
- * WebGL texture upload) to produce an application-provided font texture that
- * can be assigned to {@link Canvas.user_font}.
+ * Upload the finished canvas as a texture for {@link Canvas.user_font}.
  *
  * @example
  * ```ts
@@ -136,6 +100,7 @@ function fitsCell(box: GlyphBox, width: number, above: number, below: number): b
  *
  * @param canvas  The 2D canvas to render onto. Its `width`/`height` are set.
  * @param font    A CSS font string used to render the glyphs.
+ * @returns       A promise that resolves after the atlas has been painted.
  */
 export async function renderCp437(canvas: HTMLCanvasElement, font: string) {
 	await document.fonts.load(font);

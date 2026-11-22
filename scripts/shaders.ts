@@ -1,7 +1,4 @@
-// Codegen: embeds the GLSL shader sources in `shaders/` as string exports
-// in `src/shaders.ts`, so consumers don't need to load them at runtime.
-//
-// Usage: bun run shaders
+// Embed GLSL in src/shaders.ts so consumers can load shaders without fetching files.
 
 import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -11,7 +8,6 @@ const SHADERS_DIR = new URL("../shaders/", import.meta.url);
 async function gen(name: string, kind: "vert" | "frag"): Promise<string> {
 	const src = await readFile(new URL(`${name}.${kind}`, SHADERS_DIR), "utf8");
 
-	// e.g., terminal.vert -> export const terminal_vert = ...
 	return `export const ${name}_${kind} = \`\\\n${src}\`;`;
 }
 

@@ -1,9 +1,6 @@
 /**
  * Compile, link, and return a WebGL2 shader program from GLSL source.
  *
- * Throws with the GL info log if either shader fails to compile or the
- * program fails to link.
- *
  * @example
  * ```ts
  * import { compileProgram } from "@micahdb/tscon";
@@ -73,10 +70,6 @@ export function compileProgram(
 /**
  * Look up the locations of several vertex attributes at once.
  *
- * `mapping` is a record from an application-defined key to the GLSL attribute
- * name as written in the shader. The returned record maps each key to the
- * attribute's location.
- *
  * @example
  * ```ts
  * import { getAttribLocations } from "@micahdb/tscon";
@@ -119,10 +112,6 @@ export function getAttribLocations(
 
 /**
  * Look up the locations of several uniforms at once.
- *
- * `mapping` is a record from an application-defined key to the GLSL uniform
- * name as written in the shader. The returned record maps each key to the
- * uniform's `WebGLUniformLocation`.
  *
  * @example
  * ```ts

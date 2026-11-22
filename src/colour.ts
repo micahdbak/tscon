@@ -1,23 +1,18 @@
 /**
- * Indices into the 16-entry terminal {@link DEFAULT_COLOURS}.
+ * Indices into the 18-entry terminal {@link DEFAULT_COLOURS}.
  *
- * The palette is split into eight "dark" colours (0..7) and eight "bright"
- * colours (8..15). Glyph text encodes a foreground and background colour as
- * 4-bit values, the high bit of which selects the bright half of the palette.
- *
- * Use these members with the colour escapes understood by {@link Glyphs}
- * (`\fX`, `\FX`, `\bX`, `\BX`) and when choosing colours in code.
+ * The numeric escapes select eight dark colours (0..7) and eight bright
+ * colours (8..15). Unstyled text uses the theme foreground and background
+ * (16 and 17), which `\c` also restores.
  *
  * @example
  * ```ts
- * import { Colour } from "@micahdb/tscon";
+ * import { Colour, packCell } from "@micahdb/tscon";
  *
- * // bright-blue foreground on black background
- * const text = "\\F4\\b0Link";
+ * const cell = packCell(65, Colour.BRIGHT_BLUE, Colour.BG);
  * ```
  */
 export enum Colour {
-	// palette indices
 	BLACK = 0,
 	RED = 1,
 	GREEN = 2,
@@ -34,12 +29,12 @@ export enum Colour {
 	BRIGHT_MAGENTA = 13,
 	BRIGHT_CYAN = 14,
 	WHITE = 15,
+	FG = 16,
+	BG = 17,
 }
 
 /**
- * An 8-bit RGB colour, as `[red, green, blue]` bytes.
- *
- * Each channel is in the range `0x00`-`0xff`.
+ * RGB channels in red, green, blue order, each in the range 0-255.
  *
  * @example
  * ```ts
@@ -49,12 +44,9 @@ export enum Colour {
 export type Rgb = readonly [number, number, number];
 
 /**
- * The default 16-colour terminal palette.
+ * The default terminal palette.
  *
- * The array has 16 {@link Rgb} colours, ordered to match the {@link Colour}
- * enum. The first eight are the dark colours ({@link Colour.BLACK} ..
- * {@link Colour.GREY}) and the last eight are the bright colours
- * ({@link Colour.BRIGHT_BLACK} .. {@link Colour.WHITE}).
+ * The array is ordered by {@link Colour}.
  *
  * @example
  * ```ts
@@ -65,7 +57,7 @@ export type Rgb = readonly [number, number, number];
  */
 export const DEFAULT_COLOURS: readonly Rgb[] = [
 	// dark colours
-	[0x08, 0x08, 0x08], // Colour.BLACK
+	[0x25, 0x25, 0x30], // Colour.BLACK
 	[0xed, 0x33, 0x3b], // Colour.RED
 	[0x57, 0xe3, 0x89], // Colour.GREEN
 	[0xff, 0x78, 0x00], // Colour.ORANGE
@@ -83,14 +75,14 @@ export const DEFAULT_COLOURS: readonly Rgb[] = [
 	[0xdc, 0x8a, 0xdd], // Colour.BRIGHT_MAGENTA
 	[0x93, 0xdd, 0xc2], // Colour.BRIGHT_CYAN
 	[0xf4, 0xf4, 0xf4], // Colour.WHITE
+	[0xcd, 0xcd, 0xcd], // Colour.FG
+	[0x14, 0x14, 0x15], // Colour.BG
 ];
 
 /**
- * A terminal palette: up to 16 {@link Rgb} colours, indexed by {@link Colour}.
+ * A terminal palette: up to 18 {@link Rgb} colours, indexed by {@link Colour}.
  *
- * The constructor copies the supplied colours. Missing entries fall back to
- * the built-in defaults when the palette is applied, and {@link toFloats}
- * clamps every channel to `0`-`255`.
+ * Use {@link Canvas.setPalette} to apply it to an existing canvas.
  *
  * @example
  * ```ts
@@ -105,9 +97,14 @@ export class Palette {
 	readonly colours: Rgb[];
 
 	/**
-	 * Create a palette from up to 16 {@link Rgb} colours.
+	 * Copy the supplied RGB triples into a palette.
 	 *
-	 * @param colours  Colours to copy; omitted entries use the built-in defaults.
+	 * @example
+	 * ```ts
+	 * const palette = new Palette([[0xff, 0x00, 0x00]]);
+	 * ```
+	 *
+	 * @param colours  Initial entries indexed by {@link Colour}.
 	 */
 	constructor(colours: readonly Rgb[] = []) {
 		this.colours = colours.map(([red, green, blue]): Rgb => [
@@ -120,22 +117,22 @@ export class Palette {
 	/**
 	 * Convert the palette to normalised RGB floats for the shader.
 	 *
-	 * Missing entries use the built-in defaults; channels are clamped to `0`-`255`
-	 * and rounded. The returned array has 48 entries: 16 colours of three
-	 * channels each.
+	 * Missing entries use {@link DEFAULT_COLOURS}. Finite channels are
+	 * clamped to 0-255 and rounded before scaling to 0-1. Non-finite
+	 * channels are treated as zero.
 	 *
 	 * @example
 	 * ```ts
 	 * const floats = new Palette(DEFAULT_COLOURS).toFloats();
-	 * floats.length; // 48
+	 * floats.length; // 54
 	 * ```
 	 *
-	 * @returns  A new 48-entry `Float32Array`.
+	 * @returns  A new 54-entry `Float32Array`.
 	 */
 	toFloats(): Float32Array {
-		const data = new Float32Array(16 * 3);
+		const data = new Float32Array(DEFAULT_COLOURS.length * 3);
 
-		for (let index = 0; index < 16; index++) {
+		for (let index = 0; index < DEFAULT_COLOURS.length; index++) {
 			const [red = 0, green = 0, blue = 0] =
 				this.colours[index] ?? DEFAULT_COLOURS[index]!;
 

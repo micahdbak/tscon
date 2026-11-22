@@ -28,7 +28,8 @@ keeps the same counts still updates the viewport and actual cell dimensions.
 
 For each frame:
 
-1. Call `canvas.clear()` to clear to palette entry 0 and reset `class_name`.
+1. Call `canvas.clear()` to clear to the theme background and reset
+   `class_name`.
 2. Composite background textures with `Renderer.draw`.
 3. Call `terminal.clear()` to reset the cell buffer and `detail_text`. Blit
    content and overlays in paint order, then call `terminal.draw()`.
@@ -48,6 +49,10 @@ only the wrapped strings are needed. Use `scanEscapeAt` when parsing the same
 format for another output, such as an HTML fallback. Word wrapping fits prose,
 hard wrapping fits editor buffers, and truncation fits single-row UI. Pass
 `{ raw: true }` to display escape syntax literally.
+
+Unstyled text uses palette entries 16 and 17 for its foreground and background.
+Use `\c` to restore both. Numeric colour escapes change one channel at a time.
+Use `packCell` and `unpackCell` when transforming the 32-bit cells.
 
 In `\a0{Docs|#docs}Docs`, the anchor occupies zero columns and the trailing
 `Docs` supplies the visible cells. Each entry in `glyphs.anchors[0]` carries the

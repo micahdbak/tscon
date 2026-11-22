@@ -1,17 +1,10 @@
 const DIGIT = /\d/;
 
 /**
- * What {@link scanEscapeAt} found at a position in tscon text, and how many
- * source characters it spans.
+ * A token from {@link scanEscapeAt}, with its source length in `chars`.
  *
- * - `text` -- a character that displays. `chars` is `1`, or `2` for `\\`,
- *   which displays as a single backslash.
- * - `anchor` -- `\aX` or `\aX{options}`, taking no columns. `group` is the
- *   anchor's group (0-9) and `options` its payload, or `null` when the
- *   braces are absent or empty.
- * - `colour` -- `\fX` / `\FX` / `\bX` / `\BX`, taking no columns.
- *   `attribute` is the channel it sets (`"fg"` or `"bg"`), `bright` whether
- *   it selects the bright half of the palette, and `num` the palette index.
+ * For anchors, `options` is null for an absent or empty payload. For
+ * colours, `num` is the raw digit and `bright` records an uppercase marker.
  *
  * @example
  * ```ts
@@ -24,6 +17,7 @@ const DIGIT = /\d/;
  */
 export type EscapeScan =
 	| { kind: "text"; chars: number }
+	| { kind: "clear"; chars: 2 }
 	| { kind: "anchor"; chars: number; group: number; options: string | null }
 	| { kind: "colour"; chars: number; attribute: "fg" | "bg"; bright: boolean; num: number };
 
@@ -34,14 +28,13 @@ export type EscapeScan =
  *
  * - `\\` -- an escaped backslash, displaying one backslash
  * - `\aX` and `\aX{options}` -- an anchor in group `X` (0-9), with an
- *   optional `{...}` options string; a `{` payload must close on its own
- *   line, and one that never closes is not an escape at all, so the
- *   whole anchor renders as raw text
+ *   optional payload that must close on the same line
  * - `\fX` / `\FX` -- set foreground to colour `X` (dark / bright)
  * - `\bX` / `\BX` -- set background to colour `X` (dark / bright)
+ * - `\c` -- restore both theme colours
  *
- * The group and colour indices are a single digit 0-9; a backslash
- * followed by anything else is a lone backslash displaying itself.
+ * Group and colour indices are single digits. A backslash with an unknown
+ * or incomplete escape scans as literal text.
  *
  * @example
  * ```ts
@@ -69,6 +62,10 @@ export function scanEscapeAt(text: string, index: number): EscapeScan {
 		return { kind: "text", chars: 2 };
 	}
 
+	if (marker === "c") {
+		return { kind: "clear", chars: 2 };
+	}
+
 	if (marker === "a" && DIGIT.test(digit ?? "")) {
 		return scanAnchor(text, index, Number(digit));
 	}
@@ -87,7 +84,6 @@ export function scanEscapeAt(text: string, index: number): EscapeScan {
 }
 
 function scanAnchor(text: string, index: number, group: number): EscapeScan {
-	// without an opening brace the escape is just \aX
 	if (text[index + 3] !== "{") {
 		return { kind: "anchor", chars: 3, group, options: null };
 	}
@@ -95,8 +91,6 @@ function scanAnchor(text: string, index: number, group: number): EscapeScan {
 	const closing = text.indexOf("}", index + 4);
 	const line_end = text.indexOf("\n", index + 4);
 
-	// a payload must close on its own line; one that never closes is
-	// not an escape, so the anchor renders as raw text
 	if (closing === -1 || (line_end !== -1 && closing > line_end)) {
 		return { kind: "text", chars: 1 };
 	}
@@ -112,9 +106,8 @@ function scanAnchor(text: string, index: number, group: number): EscapeScan {
 }
 
 /**
- * Whether the text renders differently from its source anywhere: anchors
- * and colours, and also escaped backslashes, which display as one
- * character but double when re-escaped.
+ * Check for any escape recognised by {@link scanEscapeAt}, including an
+ * escaped backslash.
  *
  * @example
  * ```ts

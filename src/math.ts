@@ -1,17 +1,25 @@
 /**
  * A column-major 4x4 matrix stored as a 16-element `Float32Array`.
  *
- * `Mat4` provides static helpers for creating and operating on 4x4 matrices
- * following the conventions of `gl-matrix`-style libraries: the `o` argument
- * of each operation is the output buffer (which may alias an input) and the
- * same buffer is returned to allow chaining.
+ * Element `m[col * 4 + row]` is at column `col`, row `row`.
+ * Methods with an output buffer return that buffer. See each method for
+ * aliasing constraints.
  *
- * Matrices are stored column-major; element `m[col * 4 + row]` is row `row`,
- * column `col`.
+ * @example
+ * ```ts
+ * const model = Mat4.translation(1, 0, 0);
+ * const projection = Mat4.create();
+ * Mat4.perspective(projection, Math.PI / 3, 16 / 9, 0.1, 100);
+ * ```
  */
 export class Mat4 {
 	/**
 	 * Create and return a new 4x4 identity matrix.
+	 *
+	 * @example
+	 * ```ts
+	 * const matrix = Mat4.create();
+	 * ```
 	 *
 	 * @returns A 16-element `Float32Array` initialised to the identity
 	 *          matrix.
@@ -26,13 +34,34 @@ export class Mat4 {
 	}
 
 	/**
-	 * Set all 16 components of matrix `o` to the given values, which are
-	 * supplied in column-major order (`m00, m01, m02, m03, m10, ...`).
+	 * Set a matrix from 16 values in column-major order.
 	 *
-	 * `o` is returned for convenience.
+	 * In a component name `mCR`, `C` is the column and `R` is the row.
 	 *
-	 * @param o  The matrix to write into.
-	 * @returns  The same matrix `o`, with its components overwritten.
+	 * @example
+	 * ```ts
+	 * const matrix = Mat4.create();
+	 * Mat4.set(matrix, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 2, 0, 0, 1);
+	 * ```
+	 *
+	 * @param o    Output matrix.
+	 * @param m00  Column 0, row 0.
+	 * @param m01  Column 0, row 1.
+	 * @param m02  Column 0, row 2.
+	 * @param m03  Column 0, row 3.
+	 * @param m10  Column 1, row 0.
+	 * @param m11  Column 1, row 1.
+	 * @param m12  Column 1, row 2.
+	 * @param m13  Column 1, row 3.
+	 * @param m20  Column 2, row 0.
+	 * @param m21  Column 2, row 1.
+	 * @param m22  Column 2, row 2.
+	 * @param m23  Column 2, row 3.
+	 * @param m30  Column 3, row 0.
+	 * @param m31  Column 3, row 1.
+	 * @param m32  Column 3, row 2.
+	 * @param m33  Column 3, row 3.
+	 * @returns    The filled output matrix.
 	 */
 	static set(
 		o: Float32Array,
@@ -76,10 +105,13 @@ export class Mat4 {
 	 * Multiply matrices `a` and `b` and store the result in `o`
 	 * (`o = a * b`).
 	 *
-	 * `o` may be the same buffer as `a` or `b`. The result is equivalent to
-	 * first applying `b` then `a` (i.e. `a * b` in standard column-vector
-	 * notation), which is the order used for building model/view/projection
-	 * chains.
+	 * For column vectors, the result applies `b` before `a`.
+	 *
+	 * @example
+	 * ```ts
+	 * const model = Mat4.translation(2, 0, 0);
+	 * Mat4.multiply(model, model, Mat4.scale(2, 2, 2));
+	 * ```
 	 *
 	 * @param o  Output matrix (may alias `a` or `b`).
 	 * @param a  Left-hand matrix.
@@ -145,8 +177,11 @@ export class Mat4 {
 	/**
 	 * Set `o` to the transpose of `a`.
 	 *
-	 * `o` may be the same buffer as `a`; in that case the transpose is
-	 * performed in place.
+	 * @example
+	 * ```ts
+	 * const matrix = Mat4.rotation("z", Math.PI / 2);
+	 * Mat4.transpose(matrix, matrix);
+	 * ```
 	 *
 	 * @param o  Output matrix (may alias `a`).
 	 * @param a  Source matrix.
@@ -197,9 +232,13 @@ export class Mat4 {
 	/**
 	 * Set `o` to the inverse of `a`.
 	 *
-	 * The determinant is computed internally; if it is zero the resulting
-	 * matrix is undefined. `o` must not alias `a` (the computation
-	 * reads `a` while writing `o`).
+	 * Use an invertible input and a separate output buffer.
+	 *
+	 * @example
+	 * ```ts
+	 * const model = Mat4.translation(2, 0, 0);
+	 * const inverse = Mat4.inverse(Mat4.create(), model);
+	 * ```
 	 *
 	 * @param o  Output matrix (must not alias `a`).
 	 * @param a  Source matrix.
@@ -260,9 +299,7 @@ export class Mat4 {
 	 * Compute the upper-left 3x3 inverse-transpose of `a` and write it into
 	 * the 9-element output `o`.
 	 *
-	 * This is the standard "normal matrix" used to transform normals in a
-	 * lighting shader. `o` must be a `Float32Array` of length 9 and
-	 * must not alias `a`.
+	 * Use the result to transform normals in a lighting shader.
 	 *
 	 * @example
 	 * ```ts
@@ -275,7 +312,7 @@ export class Mat4 {
 	 * gl.uniformMatrix3fv(loc, false, normals);
 	 * ```
 	 *
-	 * @param o  Output 3x3 matrix (length-9 `Float32Array`).
+	 * @param o  Nine-element output matrix (must not alias `a`).
 	 * @param a  Source 4x4 matrix.
 	 * @returns  The matrix `o`.
 	 */
@@ -329,10 +366,12 @@ export class Mat4 {
 	/**
 	 * Set `o` to a perspective projection matrix.
 	 *
-	 * The matrix maps a view frustum defined by a vertical field of view
-	 * `fovy` (in radians), the viewport `aspect` ratio (width /
-	 * height), and the `near` and `far` clip-plane distances into clip
-	 * space, with the camera looking down -Z.
+	 * The camera looks along negative Z.
+	 *
+	 * @example
+	 * ```ts
+	 * const projection = Mat4.perspective(Mat4.create(), Math.PI / 3, 16 / 9, 0.1, 100);
+	 * ```
 	 *
 	 * @param o       Output matrix.
 	 * @param fovy    Vertical field of view, in radians.
@@ -372,8 +411,12 @@ export class Mat4 {
 	/**
 	 * Set `o` to an orthographic projection matrix.
 	 *
-	 * The matrix maps the axis-aligned box with the given left/right,
-	 * bottom/top, and near/far planes into clip space.
+	 * The supplied planes bound the box mapped into clip space.
+	 *
+	 * @example
+	 * ```ts
+	 * const projection = Mat4.orthographic(Mat4.create(), -1, 1, -1, 1, 0.1, 100);
+	 * ```
 	 *
 	 * @param o      Output matrix.
 	 * @param left   Left edge of the view volume.
@@ -413,17 +456,22 @@ export class Mat4 {
 	}
 
 	/**
-	 * Set `o` to a "look at" view matrix.
+	 * Set `o` to a view matrix that transforms world coordinates into
+	 * camera space with the camera looking along negative Z.
 	 *
-	 * Builds a camera/view matrix placed at `eye`, oriented to look towards
-	 * `center`, with the given `up` axis. The result transforms world-space
-	 * coordinates into view space (camera looking down -Z).
+	 * @example
+	 * ```ts
+	 * const eye = new Float32Array([0, 0, 5]);
+	 * const target = new Float32Array([0, 0, 0]);
+	 * const up = new Float32Array([0, 1, 0]);
+	 * const view = Mat4.lookAt(Mat4.create(), eye, target, up);
+	 * ```
 	 *
-	 * @param o       Output matrix.
-	 * @param eye     Camera position as a length-3 array `[x, y, z]`.
-	 * @param center  Point the camera looks towards, `[x, y, z]`.
-	 * @param up      Camera up direction, `[x, y, z]`.
-	 * @returns       The matrix `o`.
+	 * @param o   Output matrix.
+	 * @param e   Camera position as three components.
+	 * @param c   Point the camera looks towards, as three components.
+	 * @param up  Camera up direction as three components.
+	 * @returns   The output matrix.
 	 */
 	static lookAt(
 		o: Float32Array,
@@ -484,6 +532,11 @@ export class Mat4 {
 	/**
 	 * Create and return a translation matrix for the given offsets.
 	 *
+	 * @example
+	 * ```ts
+	 * const model = Mat4.translation(2, 0, 0);
+	 * ```
+	 *
 	 * @param tx  Translation along X.
 	 * @param ty  Translation along Y.
 	 * @param tz  Translation along Z.
@@ -503,6 +556,11 @@ export class Mat4 {
 
 	/**
 	 * Create and return a non-uniform scale matrix.
+	 *
+	 * @example
+	 * ```ts
+	 * const model = Mat4.scale(2, 1, 1);
+	 * ```
 	 *
 	 * @param sx  Scale factor along X.
 	 * @param sy  Scale factor along Y.
@@ -526,6 +584,11 @@ export class Mat4 {
 	 *
 	 * The rotation is by `radians` about one of the principal axes. The
 	 * returned matrix follows a right-handed convention.
+	 *
+	 * @example
+	 * ```ts
+	 * const model = Mat4.rotation("z", Math.PI / 2);
+	 * ```
 	 *
 	 * @param axis     The axis to rotate about: `"x"`, `"y"`, or `"z"`.
 	 * @param radians  Rotation angle in radians.
@@ -573,12 +636,22 @@ export class Mat4 {
 /**
  * A 4-component vector stored as a 4-element `Float32Array`.
  *
- * Like {@link Mat4}, `Vec4` exposes static helpers that take an output buffer
- * `o` (returned for chaining) rather than allocating on each operation.
+ * Use {@link Vec4.transformMat4} to apply a {@link Mat4} transform.
+ *
+ * @example
+ * ```ts
+ * const point = Vec4.from(1, 2, 3, 1);
+ * Vec4.transformMat4(point, point, Mat4.translation(1, 0, 0));
+ * ```
  */
 export class Vec4 {
 	/**
 	 * Create and return a new zeroed 4-component vector.
+	 *
+	 * @example
+	 * ```ts
+	 * const vector = Vec4.create();
+	 * ```
 	 *
 	 * @returns A length-4 `Float32Array` initialised to `[0, 0, 0, 0]`.
 	 */
@@ -588,6 +661,12 @@ export class Vec4 {
 
 	/**
 	 * Set the four components of vector `o` to the given values.
+	 *
+	 * @example
+	 * ```ts
+	 * const point = Vec4.create();
+	 * Vec4.set(point, 1, 2, 3, 1);
+	 * ```
 	 *
 	 * @param o  The vector to write into.
 	 * @param x  Component 0.
@@ -611,6 +690,11 @@ export class Vec4 {
 	/**
 	 * Create and return a new vector initialised to the given values.
 	 *
+	 * @example
+	 * ```ts
+	 * const point = Vec4.from(1, 2, 3, 1);
+	 * ```
+	 *
 	 * @param x  Component 0.
 	 * @param y  Component 1.
 	 * @param z  Component 2.
@@ -627,7 +711,11 @@ export class Vec4 {
 	 * Transform vector `a` by matrix `m` and store the result in `o`
 	 * (`o = m * a`, treating `a` as a column vector).
 	 *
-	 * `o` may be the same buffer as `a`.
+	 * @example
+	 * ```ts
+	 * const point = Vec4.from(1, 2, 3, 1);
+	 * Vec4.transformMat4(point, point, Mat4.translation(1, 0, 0));
+	 * ```
 	 *
 	 * @param o  Output vector (may alias `a`).
 	 * @param a  Source vector.

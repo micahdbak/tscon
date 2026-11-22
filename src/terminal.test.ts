@@ -7,14 +7,14 @@ import { HeadlessGL2 } from "./headless_gl.ts";
 import { Terminal } from "./terminal.ts";
 
 class CellGL extends HeadlessGL2 {
-	cells: Uint16Array | null = null;
+	cells: Uint32Array | null = null;
 
 	override bufferData(
 		target: number,
 		data: ArrayBufferView | ArrayBuffer | null,
 		usage: number,
 	): void {
-		if (data instanceof Uint16Array) {
+		if (data instanceof Uint32Array) {
 			this.cells = data.slice();
 		}
 

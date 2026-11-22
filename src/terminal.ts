@@ -13,14 +13,16 @@ import {
 /**
  * Renders a character grid from glyphs onto a {@link Canvas}.
  *
- * `Terminal` owns a `rows` x `cols` framebuffer of packed 16-bit glyph
- * cells (as produced by the {@link Glyphs} class) and draws it one
- * instanced quad per cell. A frame is typically: {@link clear},
- * {@link blit} one or more {@link Glyphs} blocks onto the framebuffer,
- * then {@link draw}.
+ * For each frame, call {@link clear}, copy {@link Glyphs} with {@link blit},
+ * then call {@link draw}.
  *
- * If {@link detail_text} is set, it is rendered onto the last row as a
- * status line each frame.
+ * @example
+ * ```ts
+ * const terminal = new Terminal(canvas);
+ * terminal.clear();
+ * terminal.blit(glyphs, region, region);
+ * terminal.draw();
+ * ```
  */
 export class Terminal {
 	private readonly gl_program: WebGLProgram;
@@ -29,8 +31,7 @@ export class Terminal {
 	private readonly vao: WebGLVertexArrayObject;
 	private readonly vbo: WebGLBuffer;
 
-	// framebuffer of console characters
-	private fbcon: Uint16Array;
+	private fbcon: Uint32Array;
 
 	private resized: boolean;
 
@@ -41,11 +42,8 @@ export class Terminal {
 	public canvas: Canvas;
 
 	/**
-	 * Status text shown on the bottom row, or `""` for none.
-	 *
-	 * When non-empty it is compiled to glyphs (with a bright-on-black
-	 * style) and blitted across the last row each {@link draw}. Components
-	 * use this to show hover details, link URLs, etc.
+	 * Text overlaid on the bottom row during {@link draw}. An empty string
+	 * leaves the row as blitted.
 	 */
 	public detail_text: string;
 
@@ -58,8 +56,12 @@ export class Terminal {
 	public use_user_font: boolean;
 
 	/**
-	 * Initializes the terminal for use.
-	 * Listens for `"resize"` events from the canvas.
+	 * Create a terminal that follows the canvas grid size.
+	 *
+	 * @example
+	 * ```ts
+	 * const terminal = new Terminal(canvas);
+	 * ```
 	 *
 	 * @param canvas  The canvas to render into.
 	 */
@@ -67,7 +69,7 @@ export class Terminal {
 		this.canvas = canvas;
 		const gl = canvas.gl;
 
-		this.fbcon = new Uint16Array(0);
+		this.fbcon = new Uint32Array(0);
 		this.last_detail_text = "";
 		this.detail_glyphs = null;
 		this.detail_text = "";
@@ -79,8 +81,7 @@ export class Terminal {
 		);
 
 		const attributes = getAttribLocations(gl, this.gl_program, {
-			colour: "a_colour",
-			char_code: "a_char_code",
+			cell: "a_cell",
 		});
 
 		this.uniforms = getUniformLocations(gl, this.gl_program, {
@@ -110,31 +111,9 @@ export class Terminal {
 
 		gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
 
-		// every vertex in the VBO is a 16-bit integer split like so:
-		// [ a_colour | a_char_code ]
-		// [ 8 bits   | 8 bits      ]
-
-		// a_colour
-		gl.vertexAttribIPointer(
-			attributes.colour,
-			1,
-			gl.UNSIGNED_BYTE,
-			2,
-			1,
-		);
-		gl.vertexAttribDivisor(attributes.colour, 1);
-		gl.enableVertexAttribArray(attributes.colour);
-
-		// a_char_code
-		gl.vertexAttribIPointer(
-			attributes.char_code,
-			1,
-			gl.UNSIGNED_BYTE,
-			2,
-			0,
-		);
-		gl.vertexAttribDivisor(attributes.char_code, 1);
-		gl.enableVertexAttribArray(attributes.char_code);
+		gl.vertexAttribIPointer(attributes.cell, 1, gl.UNSIGNED_INT, 4, 0);
+		gl.vertexAttribDivisor(attributes.cell, 1);
+		gl.enableVertexAttribArray(attributes.cell);
 
 		gl.bindVertexArray(null);
 
@@ -156,16 +135,11 @@ export class Terminal {
 	/**
 	 * Copy a region of a {@link Glyphs} block onto the console framebuffer.
 	 *
-	 * `src` selects the region of `glyphs` to copy and `dst` selects where
-	 * on the console it goes. `src` and `dst` must be the same size;
-	 * otherwise the blit is skipped. Both rectangles are clipped to their
-	 * respective bounds, with negative origins handled by shifting both
-	 * `src` and `dst` together, so partial off-screen copies work as
-	 * expected. The passed rectangles are copied before clipping, so they
-	 * are never modified.
-	 *
-	 * This only writes to the in-memory framebuffer; call {@link draw} to
-	 * rasterise it.
+	 * The rectangles must have equal sizes. The destination clips to the
+	 * canvas, and negative origins shift the paired rectangle. Keep the
+	 * source's right and bottom edges within the glyph grid. Later blits
+	 * replace earlier cells, including when the source cell is zero.
+	 * Call {@link draw} to present the result.
 	 *
 	 * @example
 	 * ```ts
@@ -179,7 +153,6 @@ export class Terminal {
 	 * @param dst     Destination region on the console.
 	 */
 	blit(glyphs: Glyphs, src: Rect, dst: Rect) {
-		// validate the input rects
 		if (src.rows !== dst.rows || src.cols !== dst.cols) {
 			console.log(
 				"Terminal.blit: not blitting due to bad src or dst",
@@ -187,11 +160,9 @@ export class Terminal {
 			return;
 		}
 
-		// work on copies so the caller's rects are never modified
+		// Clip copies to keep caller-owned rectangles intact.
 		src = { ...src };
 		dst = { ...dst };
-
-		// handle negatives
 
 		if (src.row < 0) {
 			const drow = Math.abs(src.row);
@@ -233,8 +204,6 @@ export class Terminal {
 			dst.cols -= dcol;
 		}
 
-		// handle overflow
-
 		if (dst.row + dst.rows > this.canvas.rows) {
 			const extra_rows = dst.row + dst.rows -
 				this.canvas.rows;
@@ -274,11 +243,16 @@ export class Terminal {
 	}
 
 	/**
-	 * Clears the framebuffer. If the canvas has been resized since the
-	 * last clear, the framebuffer is reallocated to the new `rows` x
-	 * `cols` size. Resets {@link detail_text} to `""`.
+	 * Reset the cell buffer and {@link detail_text} before blitting a frame.
 	 *
-	 * Call at the start of each frame, before blitting content.
+	 * The buffer follows the current canvas grid. Use {@link Canvas.clear}
+	 * to clear rendered pixels.
+	 *
+	 * @example
+	 * ```ts
+	 * canvas.clear();
+	 * terminal.clear();
+	 * ```
 	 */
 	clear() {
 		const gl = this.canvas.gl;
@@ -290,7 +264,7 @@ export class Terminal {
 			gl.uniform1i(this.uniforms.rows, this.canvas.rows);
 			gl.uniform1i(this.uniforms.cols, this.canvas.cols);
 
-			this.fbcon = new Uint16Array(
+			this.fbcon = new Uint32Array(
 				this.canvas.rows * this.canvas.cols,
 			);
 		}
@@ -303,11 +277,14 @@ export class Terminal {
 	/**
 	 * Rasterise the console framebuffer to the canvas.
 	 *
-	 * If {@link detail_text} changed since the last draw it is recompiled
-	 * to glyphs and blitted across the bottom row. Then the framebuffer
-	 * is uploaded and drawn with the canvas's current palette.
+	 * Call after all {@link blit} calls for the frame. Zero-valued cells leave
+	 * the underlying pixels visible.
 	 *
-	 * Call this once per frame after all {@link blit} calls are done.
+	 * @example
+	 * ```ts
+	 * terminal.blit(glyphs, region, region);
+	 * terminal.draw();
+	 * ```
 	 */
 	draw() {
 		if (this.last_detail_text !== this.detail_text) {
@@ -349,11 +326,9 @@ export class Terminal {
 		gl.useProgram(this.gl_program);
 		gl.uniform3fv(this.uniforms.palette, this.canvas.palette);
 
-		// upload glyph data to the GPU
 		gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
 		gl.bufferData(gl.ARRAY_BUFFER, this.fbcon, gl.DYNAMIC_DRAW);
 
-		// bind and activate the bitmap font
 		gl.activeTexture(gl.TEXTURE0);
 		gl.bindTexture(gl.TEXTURE_2D, this.canvas.bitmap_font);
 
@@ -366,7 +341,6 @@ export class Terminal {
 			gl.bindTexture(gl.TEXTURE_2D, user_font);
 		}
 
-		// draw glyphs: generate 6 vertices (two triangles = one quad) per glyph instance
 		gl.bindVertexArray(this.vao);
 		gl.drawArraysInstanced(
 			gl.TRIANGLES,

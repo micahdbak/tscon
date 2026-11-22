@@ -1,5 +1,5 @@
 import { WebCanvasHost, type CanvasHost } from "./canvas_host.ts";
-import { DEFAULT_COLOURS, Palette } from "./colour.ts";
+import { Colour, DEFAULT_COLOURS, Palette } from "./colour.ts";
 import { pointerCell, scrollRowsForKey, wheelRows, type Key, type WheelMode } from "./input.ts";
 import { loadModernDosTexture } from "./moderndos.ts";
 
@@ -15,7 +15,7 @@ import { loadModernDosTexture } from "./moderndos.ts";
  * ```
  */
 export type CanvasOptions = {
-	/** Initial 16-colour palette; missing entries use the built-in defaults. */
+	/** Initial 18-colour palette; missing entries use the built-in defaults. */
 	palette?: Palette;
 
 	/**
@@ -30,20 +30,12 @@ export type CanvasOptions = {
 /**
  * A WebGL2 canvas presented as a grid of character cells.
  *
- * `Canvas` owns the cell grid dimensions, the colour {@link palette}, the
- * built-in bitmap font texture ({@link bitmap_font}), an optional
- * application-provided font ({@link user_font}), and pointer/wheel/keyboard
- * state. It reads the browser surface through a {@link CanvasHost} and draws
- * through an injected WebGL2 context.
+ * `"resize"` fires when the row or column count changes. `"wheel"` carries
+ * a signed whole-row delta in `detail.rows`. `"keydown"` and `"keyup"`
+ * carry a {@link Key} in `detail`.
  *
- * It is an `EventTarget`: it dispatches `"resize"` when the grid dimensions
- * change, `"wheel"` (a `CustomEvent` with `detail.rows`) on scroll, and
- * `"keydown"` / `"keyup"` with a {@link Key} detail. Calling
- * `detail.prevent_default()` suppresses both the browser default and the
- * built-in keyboard scrolling for that key.
- *
- * Use {@link Canvas.from} for the normal browser construction, or pass a
- * {@link TestCanvasHost} and a headless WebGL2 context in tests.
+ * Use {@link Canvas.from} in a browser or supply a {@link CanvasHost}
+ * and a WebGL2 context.
  *
  * @example
  * ```ts
@@ -52,19 +44,9 @@ export type CanvasOptions = {
  * ```
  */
 export class Canvas extends EventTarget {
-	/**
-	 * Width of a single cell, in CSS pixels at 100% zoom and DPR 1.
-	 *
-	 * Used as the base unit from which {@link actual_cell_width} is derived
-	 * after accounting for device pixel ratio.
-	 */
+	/** Base cell width in CSS pixels. See {@link actual_cell_width}. */
 	static readonly CELL_WIDTH = 8;
-	/**
-	 * Height of a single cell, in CSS pixels at 100% zoom and DPR 1.
-	 *
-	 * Used as the base unit from which {@link actual_cell_height} is
-	 * derived after accounting for device pixel ratio.
-	 */
+	/** Base cell height in CSS pixels. See {@link actual_cell_height}. */
 	static readonly CELL_HEIGHT = 16;
 
 	/** The browser surface this canvas reads input and size from. */
@@ -103,17 +85,15 @@ export class Canvas extends EventTarget {
 	 */
 	mouse_owner = "";
 
-	/** Cell row the pointer is over, or `undefined` if off-canvas. */
+	/** Cell row the pointer is over, or `undefined` outside the grid. */
 	mouse_row: number | undefined = undefined;
-	/** Cell column the pointer is over, or `undefined` if off-canvas. */
+	/** Cell column the pointer is over, or `undefined` outside the grid. */
 	mouse_col: number | undefined = undefined;
 
 	/** `true` while a pointer button is held down on the canvas. */
 	mouse_down = false;
 	/**
-	 * `true` for one frame after a pointer press is released (a click).
-	 * Intended to be consumed (reset to `false`) by the draw loop after
-	 * components have processed it.
+	 * Set on pointer release. Reset it after processing the click in a frame.
 	 */
 	mouse_click = false;
 	/** Cell row where the current press started, or `undefined`. */
@@ -122,7 +102,7 @@ export class Canvas extends EventTarget {
 	mouse_down_col: number | undefined = undefined;
 
 	/**
-	 * The active 16-colour palette as normalised `[R, G, B]` floats
+	 * The active 18-colour palette as normalised `[R, G, B]` floats
 	 * (divided by `0xff`). Use {@link setPalette} to change it.
 	 */
 	readonly palette: Float32Array;
@@ -134,12 +114,10 @@ export class Canvas extends EventTarget {
 	bitmap_font: WebGLTexture;
 
 	/**
-	 * Optional application-provided font texture, or `null`. When set,
-	 * {@link Terminal}/{@link Renderer} use it for non-box-drawing glyphs
-	 * (those with char codes outside 176..223). The texture must have a 32x8
-	 * grid of equally sized glyphs and encode coverage in the red channel.
-	 * Custom glyphs are smoothed using samples from their own atlas cell.
-	 * Generate one with {@link renderCp437} and {@link loadTexture}.
+	 * Optional 32x8 glyph atlas with equal-sized cells and red-channel coverage.
+	 * Enable it per presenter with {@link Terminal.use_user_font} or
+	 * {@link Renderer.use_user_font}. Codes 176-223 use {@link bitmap_font}.
+	 * Use {@link renderCp437} to generate an atlas.
 	 */
 	user_font: WebGLTexture | null;
 
@@ -153,9 +131,11 @@ export class Canvas extends EventTarget {
 	/**
 	 * Create a canvas over a host and an injected WebGL2 context.
 	 *
-	 * The host supplies element dimensions and normalized input events. The
-	 * context is used for clearing, the built-in font, and all rendering by
-	 * {@link Terminal} and {@link Renderer}.
+	 * @example
+	 * ```ts
+	 * const host = new TestCanvasHost({ css_width: 800, css_height: 480 });
+	 * const canvas = new Canvas(host, createHeadlessGL2());
+	 * ```
 	 *
 	 * @param host     Browser or test surface to read from.
 	 * @param gl       WebGL2 context to draw through.
@@ -200,8 +180,7 @@ export class Canvas extends EventTarget {
 	/**
 	 * Create a browser canvas from an `HTMLCanvasElement`.
 	 *
-	 * Builds a {@link WebCanvasHost}, acquires a WebGL2 context, and returns
-	 * the canvas. Throws when WebGL2 is unavailable.
+	 * Uses {@link WebCanvasHost} to follow the element's CSS size and input.
 	 *
 	 * @example
 	 * ```ts
@@ -279,9 +258,8 @@ export class Canvas extends EventTarget {
 	/**
 	 * Replace the terminal palette.
 	 *
-	 * Entries are `[R, G, B]` bytes in the `0`-`255` range; out-of-range
-	 * channels are clamped, and missing entries use the built-in defaults. Existing
-	 * references to {@link palette} stay valid.
+	 * Existing references to {@link palette} stay valid. See
+	 * {@link Palette.toFloats} for channel conversion and fallback rules.
 	 *
 	 * @example
 	 * ```ts
@@ -295,18 +273,24 @@ export class Canvas extends EventTarget {
 	}
 
 	/**
-	 * Clears the framebuffer with the palette background colour
-	 * ({@link palette}[0..2]) and resets {@link class_name} to `""`.
+	 * Clear rendered pixels to {@link Colour.BG} and reset {@link class_name}.
 	 *
-	 * Call at the start of every frame, before rendering content.
+	 * Call before drawing a frame. Use {@link Terminal.clear} to reset cells.
+	 *
+	 * @example
+	 * ```ts
+	 * canvas.clear();
+	 * terminal.clear();
+	 * ```
 	 */
 	clear(): void {
 		const gl = this.gl;
+		const offset = Colour.BG * 3;
 
 		gl.clearColor(
-			this.palette[0],
-			this.palette[1],
-			this.palette[2],
+			this.palette[offset],
+			this.palette[offset + 1],
+			this.palette[offset + 2],
 			1.0,
 		);
 		gl.clear(gl.COLOR_BUFFER_BIT);

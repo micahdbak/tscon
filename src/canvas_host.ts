@@ -49,13 +49,8 @@ export type CanvasHostEventMap = {
 /**
  * The browser-facing surface a {@link Canvas} needs.
  *
- * A host reports the element's CSS and device-pixel size, device pixel
- * ratio, focus state, and normalized pointer, wheel, and keyboard events.
- * It does not know the cell grid, the WebGL context, or the application.
- *
- * {@link WebCanvasHost} implements this over an `HTMLCanvasElement`;
- * {@link TestCanvasHost} implements it headlessly and lets tests inject
- * events directly.
+ * Use {@link WebCanvasHost} for an HTML canvas or {@link TestCanvasHost}
+ * to inject size and input events in tests.
  *
  * @example
  * ```ts
@@ -148,20 +143,14 @@ abstract class CanvasHostBase implements CanvasHost {
 /**
  * A {@link CanvasHost} backed by an `HTMLCanvasElement`.
  *
- * Owns the element's CSS/device sizing, focus state, pointer capture, and
- * native pointer, wheel, and keyboard listeners. Resizing applies
- * `devicePixelRatio` to the element's backing store and emits a normalized
- * `"resize"` event.
- *
- * The element's box is observed directly, so a size change is followed
- * wherever it comes from -- a window resize, a stylesheet arriving after the
- * host was constructed, a dynamic viewport change on mobile, or the element
- * being unhidden. Listening to `window` resizes alone misses all of those.
+ * Observes the element's CSS box and scales its backing store by the device
+ * pixel ratio. This picks up element resizing even when the window size
+ * stays fixed.
  *
  * @example
  * ```ts
  * const host = new WebCanvasHost(canvasElement);
- * const gl = canvasElement.getContext("webgl2");
+ * const gl = canvasElement.getContext("webgl2")!;
  * const canvas = new Canvas(host, gl);
  * ```
  */
@@ -171,8 +160,6 @@ export class WebCanvasHost extends CanvasHostBase {
 
 	private readonly element_resize: ResizeObserver;
 
-	// the backing-store size last written, which an element with no CSS sizing
-	// takes as its box; used to ignore the observer echo of our own write
 	private written_width = 0;
 	private written_height = 0;
 
@@ -314,8 +301,7 @@ export class WebCanvasHost extends CanvasHostBase {
 		const pixel_width = css_width * dpr;
 		const pixel_height = css_height * dpr;
 
-		// an element sized by its attributes rather than by CSS reports the
-		// backing store we just wrote as its box; that echo is not a resize
+		// Ignore our own backing-store resize on attribute-sized canvases.
 		if (css_width > 0 && css_width === this.written_width && css_height === this.written_height) {
 			return;
 		}
@@ -480,7 +466,9 @@ export class TestCanvasHost extends CanvasHostBase {
 	}
 
 	/**
-	 * Move the virtual pointer to the centre of a cell.
+	 * Move the virtual pointer to a cell centre in a full-element grid.
+	 *
+	 * For a grid with margins, use {@link pointerMove} with CSS coordinates.
 	 *
 	 * @param row   Cell row.
 	 * @param col   Cell column.

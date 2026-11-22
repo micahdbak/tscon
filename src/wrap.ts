@@ -23,12 +23,7 @@ export enum Wrap {
 }
 
 /**
- * The column width a tab advances to, in cells.
- *
- * A tab in tscon text moves the next character to the next multiple of this
- * width, so tabs line up in columns regardless of what precedes them. Apply
- * the same width when you build equivalent text outside tscon, such as an
- * HTML fallback.
+ * Tab stop interval in cells. Tabs advance to the next multiple of this value.
  *
  * @example
  * ```ts
@@ -78,8 +73,7 @@ export type TextLayout = {
 	source: number[];
 };
 
-// the layout pass textToLines and Glyphs share: rows, plus where each one
-// begins in the source so positions can be tracked
+// Shared layout pass for textToLines and Glyphs.
 export function layoutText(
 	text: string,
 	cols: number,
@@ -146,11 +140,7 @@ export function textToLines(
 }
 
 /**
- * Removes line continuations -- a lone backslash immediately followed by
- * a newline -- joining the lines around them.
- *
- * `source[i]` records the original index of every surviving character,
- * so positions in the stripped text lift back to the source text.
+ * Join continued lines and keep each surviving character's source index.
  */
 function stripContinuations(text: string): { text: string; source: number[] } {
 	let stripped = "";
@@ -159,7 +149,6 @@ function stripContinuations(text: string): { text: string; source: number[] } {
 	for (let i = 0; i < text.length; ) {
 		const scan = scanEscapeAt(text, i);
 
-		// a lone backslash before a newline continues the line
 		if (scan.kind === "text" && scan.chars === 1 && text[i] === "\\" && text[i + 1] === "\n") {
 			i += 2;
 			continue;
@@ -186,17 +175,14 @@ function skipBlankRun(text: string, start: number): number {
 		start++;
 	}
 
-	// just in case there was a newline
 	if (start < text.length && text[start] === "\n") {
 		start++;
 	}
 
-	// reached the end of text
 	if (start >= text.length) {
 		return -1;
 	}
 
-	// return index of last blank
 	return start - 1;
 }
 
@@ -206,10 +192,7 @@ interface Laid {
 	starts: number[];
 }
 
-// the word-wrap and truncate modes share this line-breaking walk: escapes
-// take no columns, and each visible character either fits, breaks the
-// line, or ends it. Pieces stay verbatim slices, so every break records
-// the offset it starts at
+// Preserve source offsets for word-wrapped and truncated rows.
 function wrapLines(
 	text: string,
 	cols: number,
@@ -234,7 +217,6 @@ function wrapLines(
 		if (!raw) {
 			const scan = scanEscapeAt(text, i);
 
-			// escapes take no columns: skip past them uncounted
 			if (scan.kind !== "text") {
 				i += scan.chars - 1;
 				continue;
@@ -247,7 +229,6 @@ function wrapLines(
 			}
 		}
 
-		// newline
 		if (c === "\n") {
 			breakLine(start, i);
 
@@ -258,7 +239,6 @@ function wrapLines(
 			continue;
 		}
 
-		// tab
 		if (c === "\t") {
 			const tab_cols = TAB_WIDTH - (used % TAB_WIDTH);
 
@@ -267,7 +247,6 @@ function wrapLines(
 
 				const next = word_wrap ? skipBlankRun(text, i + 1) : text.indexOf("\n", i + 1);
 
-				// end of text: the line was cut, nothing follows
 				if (next < 0) {
 					return { pieces, starts };
 				}
@@ -284,20 +263,16 @@ function wrapLines(
 			continue;
 		}
 
-		// space
 		if (c === " ") {
 			last_space = i;
 		}
 
-		// exceeding available width
 		if (used + 1 > cols) {
-			// skip rest of line if not wrapping
 			if (!word_wrap) {
 				breakLine(start, i);
 
 				const next = text.indexOf("\n", i + 1);
 
-				// end of text: the line was truncated, nothing follows
 				if (next < 0) {
 					return { pieces, starts };
 				}
@@ -310,7 +285,6 @@ function wrapLines(
 				continue;
 			}
 
-			// this is a continuous word that filled the whole line
 			if (last_space < 0) {
 				breakLine(start, i);
 
@@ -321,7 +295,6 @@ function wrapLines(
 				continue;
 			}
 
-			// otherwise, will break at last space
 
 			breakLine(start, last_space);
 
@@ -346,10 +319,7 @@ function wrapLines(
 	return { pieces, starts };
 }
 
-// the hard mode: rows of exactly `cols` visible characters, zero-width
-// escapes attached to the visible character they precede. Raw mode is
-// the same walk with every character visible; tabs still advance to the
-// next tab stop
+// Keep zero-width escapes with the character they affect across a hard break.
 function hardWrapLines(text: string, cols: number, raw: boolean): Laid {
 	const pieces: string[] = [];
 	const starts: number[] = [];

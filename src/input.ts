@@ -45,25 +45,20 @@ export type Key = {
 };
 
 /**
- * The cell under a pointer position, or `null` when the position is outside
- * the element.
- *
- * `x` and `y` are CSS pixels relative to the element's top-left corner.
- * `css_width` and `css_height` are the element's CSS size, and `rows` and
- * `cols` are the current cell-grid dimensions.
+ * Map a CSS pointer position to a cell within the grid.
  *
  * @example
  * ```ts
  * pointerCell(40, 80, 800, 480, 30, 100); // { row: 5, col: 5 }
  * ```
  *
- * @param x           Pointer x position, in CSS pixels.
- * @param y           Pointer y position, in CSS pixels.
- * @param css_width   Element width, in CSS pixels.
- * @param css_height  Element height, in CSS pixels.
+ * @param x           CSS x offset from the grid's left edge.
+ * @param y           CSS y offset from the grid's top edge.
+ * @param css_width   Grid width in CSS pixels.
+ * @param css_height  Grid height in CSS pixels.
  * @param rows        Number of cell rows.
  * @param cols        Number of cell columns.
- * @returns           The cell under the pointer, or `null` outside.
+ * @returns           The cell under the pointer, or null outside the grid.
  */
 export function pointerCell(
 	x: number,
