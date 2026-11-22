@@ -197,7 +197,8 @@ void main() {
 	int dim = (bayer_val < dims.ratio) ? dims.dim2 : dims.dim1;
 	float lum = getLum(colour, dim);
 
-	float dither = (bayer_val - 0.5) / 12.0;
+	float levels = (f_mode == BG_GLYPHS_MODE) ? 36.0 : 12.0;
+	float dither = (bayer_val - 0.5) / levels;
 	lum = clamp(lum + dither, 0.0, 1.0);
 
 	Glyph glyph;
