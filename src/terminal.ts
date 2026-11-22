@@ -23,13 +23,11 @@ import {
  * status line each frame.
  */
 export class Terminal {
-	private gl_program: WebGLProgram;
+	private readonly gl_program: WebGLProgram;
+	private readonly uniforms: Record<string, WebGLUniformLocation>;
 
-	private attributes: Record<string, number>;
-	private uniforms: Record<string, WebGLUniformLocation>;
-
-	private vao: WebGLVertexArrayObject;
-	private vbo: WebGLBuffer;
+	private readonly vao: WebGLVertexArrayObject;
+	private readonly vbo: WebGLBuffer;
 
 	// framebuffer of console characters
 	private fbcon: Uint16Array;
@@ -80,7 +78,7 @@ export class Terminal {
 			terminal_frag,
 		);
 
-		this.attributes = getAttribLocations(gl, this.gl_program, {
+		const attributes = getAttribLocations(gl, this.gl_program, {
 			colour: "a_colour",
 			char_code: "a_char_code",
 		});
@@ -118,25 +116,25 @@ export class Terminal {
 
 		// a_colour
 		gl.vertexAttribIPointer(
-			this.attributes.colour,
+			attributes.colour,
 			1,
 			gl.UNSIGNED_BYTE,
 			2,
 			1,
 		);
-		gl.vertexAttribDivisor(this.attributes.colour, 1);
-		gl.enableVertexAttribArray(this.attributes.colour);
+		gl.vertexAttribDivisor(attributes.colour, 1);
+		gl.enableVertexAttribArray(attributes.colour);
 
 		// a_char_code
 		gl.vertexAttribIPointer(
-			this.attributes.char_code,
+			attributes.char_code,
 			1,
 			gl.UNSIGNED_BYTE,
 			2,
 			0,
 		);
-		gl.vertexAttribDivisor(this.attributes.char_code, 1);
-		gl.enableVertexAttribArray(this.attributes.char_code);
+		gl.vertexAttribDivisor(attributes.char_code, 1);
+		gl.enableVertexAttribArray(attributes.char_code);
 
 		gl.bindVertexArray(null);
 
@@ -145,7 +143,6 @@ export class Terminal {
 		gl.uniform1i(this.uniforms.cols, this.canvas.cols);
 		gl.uniform1i(this.uniforms.bitmap_font, 0);
 		gl.uniform1i(this.uniforms.user_font, 1);
-		gl.uniform1i(this.uniforms.use_user_font, 0);
 
 		this.resized = true;
 
@@ -360,17 +357,13 @@ export class Terminal {
 		gl.activeTexture(gl.TEXTURE0);
 		gl.bindTexture(gl.TEXTURE_2D, this.canvas.bitmap_font);
 
-		// user application-provided font
-		if (this.use_user_font) {
-			gl.uniform1i(this.uniforms.use_user_font, 1);
-		}
+		const user_font = this.canvas.user_font;
+		const use_user_font = this.use_user_font && user_font !== null;
+		gl.uniform1i(this.uniforms.use_user_font, Number(use_user_font));
 
-		if (this.canvas.user_font !== null) {
+		if (use_user_font) {
 			gl.activeTexture(gl.TEXTURE1);
-			gl.bindTexture(gl.TEXTURE_2D, this.canvas.user_font);
-		} else if (this.use_user_font) {
-			this.use_user_font = false;
-			gl.uniform1i(this.uniforms.use_user_font, 0);
+			gl.bindTexture(gl.TEXTURE_2D, user_font);
 		}
 
 		// draw glyphs: generate 6 vertices (two triangles = one quad) per glyph instance

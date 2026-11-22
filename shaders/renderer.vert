@@ -1,10 +1,9 @@
 #version 300 es
 
 #define SAMPLE_MODE	0u
-#define GLYPHS_MODE	1u
 #define BG_GLYPHS_MODE	2u
 
-precision mediump float;
+precision highp float;
 
 in uint a_row;
 in uint a_col;
@@ -21,7 +20,6 @@ uniform sampler2D u_texture;
 
 out vec2 v_cell_coord;
 out vec2 v_tex_uv_coord; // sample mode
-out vec2 v_font_uv_coord;
 
 flat out uint f_mode;
 flat out vec3 f_fg_colour;
@@ -223,11 +221,7 @@ void main() {
 	int glyph_row = clamp(int(glyph.char_code / 32), 0, 7);
 	int glyph_col = clamp(int(glyph.char_code % 32), 0, 31);
 
-	// coordinate of char_code in u_bitmap_font
-	f_glyph_coord = ivec2(glyph_col, glyph_row << 2);
+	f_glyph_coord = ivec2(glyph_col, glyph_row);
 
 	f_char_code = glyph.char_code;
-
-	v_font_uv_coord = vec2(float(glyph_col + col_inc) / 32.0,
-			       float(glyph_row + row_inc) / 8.0);
 }

@@ -19,13 +19,11 @@ import type { Rect } from "./rect.ts";
  * coloured characters.
  */
 export class Renderer {
-	private gl_program: WebGLProgram;
+	private readonly gl_program: WebGLProgram;
+	private readonly uniforms: Record<string, WebGLUniformLocation>;
 
-	private attributes: Record<string, number>;
-	private uniforms: Record<string, WebGLUniformLocation>;
-
-	private vao: WebGLVertexArrayObject;
-	private vbo: WebGLBuffer;
+	private readonly vao: WebGLVertexArrayObject;
+	private readonly vbo: WebGLBuffer;
 
 	private resized: boolean;
 
@@ -56,7 +54,7 @@ export class Renderer {
 			renderer_frag,
 		);
 
-		this.attributes = getAttribLocations(gl, this.gl_program, {
+		const attributes = getAttribLocations(gl, this.gl_program, {
 			row: "a_row",
 			col: "a_col",
 			mode: "a_mode",
@@ -100,50 +98,45 @@ export class Renderer {
 
 		// a_row
 		gl.vertexAttribIPointer(
-			this.attributes.row,
+			attributes.row,
 			1,
 			gl.UNSIGNED_BYTE,
 			4,
 			3,
 		);
-		gl.vertexAttribDivisor(this.attributes.row, 1);
-		gl.enableVertexAttribArray(this.attributes.row);
+		gl.vertexAttribDivisor(attributes.row, 1);
+		gl.enableVertexAttribArray(attributes.row);
 
 		// a_mode
 		gl.vertexAttribIPointer(
-			this.attributes.mode,
+			attributes.mode,
 			1,
 			gl.UNSIGNED_BYTE,
 			4,
 			2,
 		);
-		gl.vertexAttribDivisor(this.attributes.mode, 1);
-		gl.enableVertexAttribArray(this.attributes.mode);
+		gl.vertexAttribDivisor(attributes.mode, 1);
+		gl.enableVertexAttribArray(attributes.mode);
 
 		// a_col
 		gl.vertexAttribIPointer(
-			this.attributes.col,
+			attributes.col,
 			1,
 			gl.UNSIGNED_SHORT,
 			4,
 			0,
 		);
-		gl.vertexAttribDivisor(this.attributes.col, 1);
-		gl.enableVertexAttribArray(this.attributes.col);
+		gl.vertexAttribDivisor(attributes.col, 1);
+		gl.enableVertexAttribArray(attributes.col);
 
 		gl.bindVertexArray(null);
 
 		gl.useProgram(this.gl_program);
-		gl.uniform1i(this.uniforms.row, 0);
-		gl.uniform1i(this.uniforms.col, 0);
-		gl.uniform1i(this.uniforms.rows, 0);
-		gl.uniform1i(this.uniforms.cols, 0);
 		gl.uniform1i(this.uniforms.canvas_rows, this.canvas.rows);
 		gl.uniform1i(this.uniforms.canvas_cols, this.canvas.cols);
 		gl.uniform1i(this.uniforms.bitmap_font, 0);
 		gl.uniform1i(this.uniforms.texture, 1);
 		gl.uniform1i(this.uniforms.user_font, 2);
-		gl.uniform1i(this.uniforms.use_user_font, 0);
 
 		this.resized = false;
 
@@ -218,17 +211,13 @@ export class Renderer {
 		gl.activeTexture(gl.TEXTURE1);
 		gl.bindTexture(gl.TEXTURE_2D, texture);
 
-		// user application-provided font
-		if (this.use_user_font) {
-			gl.uniform1i(this.uniforms.use_user_font, 1);
-		}
+		const user_font = this.canvas.user_font;
+		const use_user_font = this.use_user_font && user_font !== null;
+		gl.uniform1i(this.uniforms.use_user_font, Number(use_user_font));
 
-		if (this.canvas.user_font !== null) {
+		if (use_user_font) {
 			gl.activeTexture(gl.TEXTURE2);
-			gl.bindTexture(gl.TEXTURE_2D, this.canvas.user_font);
-		} else if (this.use_user_font) {
-			this.use_user_font = false;
-			gl.uniform1i(this.uniforms.use_user_font, 0);
+			gl.bindTexture(gl.TEXTURE_2D, user_font);
 		}
 
 		// draw the glyphs covered by the provided texture glyphs

@@ -10,12 +10,21 @@ import { loadModernDosTexture } from "./moderndos.ts";
  * ```ts
  * const canvas = Canvas.from(element, {
  *   palette: new Palette([[0xff, 0x00, 0x00]]),
+ *   stretch: true,
  * });
  * ```
  */
 export type CanvasOptions = {
 	/** Initial 16-colour palette; missing entries use the built-in defaults. */
 	palette?: Palette;
+
+	/**
+	 * Stretch cells to fill the canvas, allowing fractional cell sizes.
+	 * Defaults to false, which uses integer multiples of 8x16 device pixels
+	 * and leaves any extra space on the right and bottom. Canvases smaller
+	 * than one 8x16 cell always use the full-canvas grid.
+	 */
+	stretch?: boolean;
 };
 
 /**
@@ -64,8 +73,11 @@ export class Canvas extends EventTarget {
 	readonly gl: WebGL2RenderingContext;
 
 	private readonly unsubscribers: (() => void)[] = [];
+	private readonly stretch: boolean;
 
 	private wheel_px: number;
+	private grid_width = 0;
+	private grid_height = 0;
 
 	/** Width of the canvas in device pixels (CSS pixels x DPR). */
 	width = 0;
@@ -124,8 +136,10 @@ export class Canvas extends EventTarget {
 	/**
 	 * Optional application-provided font texture, or `null`. When set,
 	 * {@link Terminal}/{@link Renderer} use it for non-box-drawing glyphs
-	 * (those with char codes outside 176..223). Generate one with
-	 * {@link renderCp437} and {@link loadTexture}.
+	 * (those with char codes outside 176..223). The texture must have a 32x8
+	 * grid of equally sized glyphs and encode coverage in the red channel.
+	 * Custom glyphs are smoothed using samples from their own atlas cell.
+	 * Generate one with {@link renderCp437} and {@link loadTexture}.
 	 */
 	user_font: WebGLTexture | null;
 
@@ -155,6 +169,7 @@ export class Canvas extends EventTarget {
 		super();
 		this.host = host;
 		this.gl = gl;
+		this.stretch = options.stretch ?? false;
 		this.wheel_px = 0;
 		this.palette = (options.palette ?? new Palette(DEFAULT_COLOURS)).toFloats();
 		this.bitmap_font = loadModernDosTexture(gl);
@@ -313,35 +328,27 @@ export class Canvas extends EventTarget {
 		const host = this.host;
 		const gl = this.gl;
 
-		this.width = host.pixel_width;
-		this.height = host.pixel_height;
+		this.width = this.stretch ? host.pixel_width : Math.floor(host.pixel_width);
+		this.height = this.stretch ? host.pixel_height : Math.floor(host.pixel_height);
 
-		gl.viewport(0, 0, this.width, this.height);
+		const max_pixel_scale = Math.floor(
+			Math.min(this.width / Canvas.CELL_WIDTH, this.height / Canvas.CELL_HEIGHT),
+		);
+		const snap_grid = !this.stretch && max_pixel_scale >= 1;
+		const scale = snap_grid
+			? Math.min(max_pixel_scale, Math.max(1, Math.round(host.dpr)))
+			: Math.max(0.5, host.dpr);
+		const cell_height = Canvas.CELL_HEIGHT * scale;
+		const cell_width = Canvas.CELL_WIDTH * scale;
+		const round_cells = snap_grid ? Math.floor : Math.round;
+		const rows = Math.min(256, Math.max(1, round_cells(this.height / cell_height)));
+		const cols = Math.min(1024, Math.max(1, round_cells(this.width / cell_width)));
 
-		const target_cell_height = Math.max(
-			Canvas.CELL_HEIGHT / 2,
-			Canvas.CELL_HEIGHT * host.dpr,
-		);
-		const target_cell_width = Math.max(
-			Canvas.CELL_WIDTH / 2,
-			Canvas.CELL_WIDTH * host.dpr,
-		);
-
-		const rows = Math.round(
-			Math.min(
-				Math.max(1, this.height / target_cell_height),
-				256,
-			),
-		);
-		const cols = Math.round(
-			Math.min(
-				Math.max(1, this.width / target_cell_width),
-				1024,
-			),
-		);
-
-		this.actual_cell_height = this.height / rows;
-		this.actual_cell_width = this.width / cols;
+		this.grid_height = snap_grid ? rows * cell_height : this.height;
+		this.grid_width = snap_grid ? cols * cell_width : this.width;
+		this.actual_cell_height = this.grid_height / rows;
+		this.actual_cell_width = this.grid_width / cols;
+		gl.viewport(0, this.height - this.grid_height, this.grid_width, this.grid_height);
 
 		this.mouse_owner = "";
 		this.mouse_row = undefined;
@@ -363,8 +370,8 @@ export class Canvas extends EventTarget {
 		const cell = pointerCell(
 			x,
 			y,
-			this.host.css_width,
-			this.host.css_height,
+			this.host.css_width * (this.grid_width / (this.width || 1)),
+			this.host.css_height * (this.grid_height / (this.height || 1)),
 			this.rows,
 			this.cols,
 		);
@@ -394,9 +401,8 @@ export class Canvas extends EventTarget {
 	}
 
 	private scroll(delta_mode: WheelMode, delta_y: number): void {
-		const cell_height = this.rows > 0
-			? this.host.css_height / this.rows
-			: 0;
+		const cell_height = this.host.css_height *
+			(this.actual_cell_height / (this.height || 1));
 
 		this.wheel_px += wheelRows(
 			delta_mode,

@@ -8,7 +8,6 @@ uniform int u_cols;
 uniform vec3 u_palette[16];
 
 out vec2 v_cell_coord;
-out vec2 v_uv_coord;
 
 flat out vec3 f_fg_colour;
 flat out vec3 f_bg_colour;
@@ -39,9 +38,7 @@ void main() {
 	int glyph_row = clamp(int(a_char_code / 32u), 0, 7);
 	int glyph_col = clamp(int(a_char_code % 32u), 0, 31);
 
-	// coordinate of a_char_code in u_bitmap_font
-	// (note: there are 4 pixels per glyph, in a column; hence row * 4)
-	f_glyph_coord = ivec2(glyph_col, glyph_row * 4);
+	f_glyph_coord = ivec2(glyph_col, glyph_row);
 
 	// used when checking whether to use u_user_font or not
 	f_char_code = a_char_code;
@@ -63,9 +60,6 @@ void main() {
 
 	row += row_inc;
 	col += col_inc;
-
-	v_uv_coord = vec2(float(glyph_col + col_inc) / 32.0,
-			  float(glyph_row + row_inc) / 8.0);
 
 	// position needs to be in [-1.0, 1.0]
 	float ndc_x = 2.0 * float(col) / float(u_cols) - 1.0;

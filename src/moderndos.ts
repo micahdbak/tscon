@@ -257,52 +257,13 @@ const PC_FACE_MODERNDOS_8X16_FONT_MAP: number[][] = [
   [0x00, 0x00, 0x00, 0x00, 0x7c, 0x7c, 0x7c, 0x7c, 0x7c, 0x7c, 0x7c, 0x00, 0x00, 0x00, 0x00, 0x00], // [■] (254)
 ];
 
-/*
-The above binary font is layed out in a texture where a single glyph spans a column of four pixels;
-each pixel is four bytes (expressed as RGBA), where each of these bytes forms a "stack" of a glyph.
-Thus, as each glyph is 8 bits by 16 bits, each row of a glyph is 1 byte, and as there are 16 rows,
-then it needs 16 bytes for the whole glyph; as each pixel is RGBA, then it needs 16 / 4 = 4 pixels
-for the whole glyph. The layout where a single pixel in the texture is a stack for a single glyph
-rather than side by side rows in four separate glyphs is so that the final texture size is 32 by 32,
-which is much nicer than 8 by 128.
-
-Following is an example 4x4 texture for the glyphs "ABCD" in the above font, where each pixel is
-stacked in the proper representation into visual "blocks". Each block is a pixel in the texture,
-and is therefore ordered in memory from left-to-right, top-to-bottom:
-
-00000000 00000000 00000000 00000000
-00000000 00000000 00000000 00000000
-00111000 11111100 01111100 11111100
-01101100 01100110 11000110 01100110
-
-11000110 01100110 11000110 01100110
-11000110 01100110 11000000 01100110
-11000110 01111100 11000000 01100110
-11111110 01100110 11000000 01100110
-
-11000110 01100110 11000000 01100110
-11000110 01100110 11000110 01100110
-11000110 01100110 11000110 01100110
-11000110 11111100 01111100 11111100
-
-00000000 00000000 00000000 00000000
-00000000 00000000 00000000 00000000
-00000000 00000000 00000000 00000000
-00000000 00000000 00000000 00000000
-*/
-
+/** Upload the 32x8 glyph grid as four RGBA texels per glyph, one byte per bitmap row. */
 export function loadModernDosTexture(gl: WebGL2RenderingContext): WebGLTexture {
-	// see above comment for why the width/height of the texture is 32x32
-	const width = 32;
-	const height = 32;
-
-	// each pixel is RGBA and takes 4 bytes
+	const cols = 32;
+	const width = cols;
+	const height = 8 * 4;
 	const pixels = new Uint8Array(width * height * 4);
 
-	const cols = 32; // in terms of glyphs
-	//const rows = 8;
-
-	// for every glyph in the moderndos font
 	for (let i = 1; i < 255; i++) {
 		const x = i % cols;
 		const y = 4 * Math.floor(i / cols);

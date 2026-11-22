@@ -67,6 +67,55 @@ describe("Canvas", () => {
 		expect(canvas.palette[6]).toBeCloseTo(DEFAULT_COLOURS[2]![0] / 0xff);
 	});
 
+	test("uses whole bitmap pixels and excludes the margins from hit testing", () => {
+		const host = new TestCanvasHost({ css_width: 82, css_height: 166, dpr: 1.5 });
+		const gl = createHeadlessGL2();
+		const viewports: number[][] = [];
+		gl.viewport = (x, y, width, height) => {
+			viewports.push([x, y, width, height]);
+		};
+		const canvas = new Canvas(host, gl);
+
+		expect(viewports).toEqual([[0, 25, 112, 224]]);
+		expect(canvas.cols).toBe(7);
+		expect(canvas.rows).toBe(7);
+		expect(canvas.actual_cell_width).toBe(16);
+		expect(canvas.actual_cell_height).toBe(32);
+
+		host.pointerMove(74, 149);
+		expect(canvas.mouse_col).toBe(6);
+		expect(canvas.mouse_row).toBe(6);
+
+		host.pointerMove(75, 149);
+		expect(canvas.mouse_col).toBeUndefined();
+
+		host.pointerMove(74, 150);
+		expect(canvas.mouse_row).toBeUndefined();
+
+		host.resize(4, 8, 1);
+		expect(viewports.at(-1)).toEqual([0, 0, 4, 8]);
+		expect(canvas.cols).toBe(1);
+		expect(canvas.rows).toBe(1);
+	});
+
+	test("stretch fills the canvas and includes the edge in hit testing", () => {
+		const host = new TestCanvasHost({ css_width: 82, css_height: 166, dpr: 1.5 });
+		const gl = createHeadlessGL2();
+		const viewports: number[][] = [];
+		gl.viewport = (x, y, width, height) => {
+			viewports.push([x, y, width, height]);
+		};
+		const canvas = new Canvas(host, gl, { stretch: true });
+
+		expect(viewports).toEqual([[0, 0, 123, 249]]);
+		expect(canvas.actual_cell_width).toBe(123 / 10);
+		expect(canvas.actual_cell_height).toBe(249 / 10);
+
+		host.pointerMove(81, 165);
+		expect(canvas.mouse_col).toBe(9);
+		expect(canvas.mouse_row).toBe(9);
+	});
+
 	test("setPalette updates the existing palette array", () => {
 		const { canvas } = harness();
 		const palette = canvas.palette;
