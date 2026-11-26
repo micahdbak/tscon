@@ -54,18 +54,23 @@ Unstyled text uses palette entries 16 and 17 for its foreground and background.
 Use `\c` to restore both. Numeric colour escapes change one channel at a time.
 Use `packCell` and `unpackCell` when transforming the 32-bit cells.
 
-In `\a0{Docs|#docs}Docs`, the anchor occupies zero columns and the trailing
-`Docs` supplies the visible cells. Each entry in `glyphs.anchors[0]` carries the
-position and source index of the following character. The payload is application
-data, and its closing brace must be on the same line. After reflow, read
-positions from the new `Glyphs` instance.
+In `\a0{options}text`, the anchor has no closing escape, occupies zero columns,
+and leaves the trailing `text` as visible cells. Each entry in
+`glyphs.anchors[0]` carries `row`, `col`, and `index` for the following
+character, plus `start` and `end` for the escape's source range. The payload is
+application data, and its closing brace must be on the same line. Adjacent
+anchors can share `index`; use `start` and `end` when their source order
+matters. After reflow, read positions from the new `Glyphs` instance.
 
-For wrapped links and selection, convert the source range to row runs with
-`spansFor(start, end)` and translate those runs by the view's origin and scroll
-offset. Use `renderedCell` to locate a character's cell, `cursorCell` to place
-the caret on indices such as escapes and tabs, and `cursorIndex` to map a hit
-back to source text. Cache restyled glyphs until their content or visual state
-changes.
+For wrapped links and selection, resolve a source range with
+`spansFor(start, end)`. It returns `Spans`, a selection over that grid. Use
+`contains` for hit testing relative to the grid, `equals` to compare run
+geometry, and `mapCells` to restyle only the selected cells. Use
+`blit(terminal, origin, clip)` to draw the runs at a translated origin with an
+optional destination clip. Cache decorated `Spans` until the grid, range, or
+visual state changes. Use `renderedCell` to locate a character's cell,
+`cursorCell` to place the caret on indices such as escapes and tabs, and
+`cursorIndex` to map a hit back to source text.
 
 Check hover with `canvas.mouseAt`. For click activation, combine
 `canvas.mouse_click` with the current pointer and press-origin hit tests as

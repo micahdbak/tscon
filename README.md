@@ -20,7 +20,8 @@ if WebGL2 is unavailable.
 ```ts
 import { Canvas, Glyphs, Terminal } from "@micahdb/tscon";
 
-const canvas = Canvas.from(document.querySelector("canvas")!);
+const element = document.querySelector<HTMLCanvasElement>("canvas")!;
+const canvas = Canvas.from(element);
 const terminal = new Terminal(canvas);
 const glyphs = new Glyphs("Hello, tscon!", canvas.cols);
 const region = { row: 0, col: 0, rows: glyphs.rows, cols: glyphs.cols };
@@ -56,21 +57,28 @@ the column limit, `Wrap.TRUNCATE` to discard overflow, or `{ raw: true }` to
 show escape syntax literally. Use `textToLines` when you only need the wrapped
 text.
 
-Anchors take no columns. Their payload is application data and its closing brace
-must be on the same line. Use the compiled positions to place links, images, or
-other overlays. Source indices are offsets in the original JavaScript string,
-including escapes.
+An anchor marks the next visible cell and has no closing escape. Its payload is
+application data and its closing brace must be on the same line. Each anchor
+records the visible cell it marks and the source range of its escape. Use those
+to place links, images, or other overlays. Source indices are offsets in the
+original JavaScript string, including escapes.
 
 ```ts
 import { Glyphs } from "@micahdb/tscon";
 
-const glyphs = new Glyphs("Click \\a0{here|#}here", 40);
+const glyphs = new Glyphs("\\a0{options}text", 40);
 
-glyphs.anchors[0]![0]!;  // { options: "here|#", row: 0, col: 6, index: 17 }
-glyphs.renderedCell(17); // { row: 0, col: 6 }
-glyphs.cursorIndex(0, 9); // 20
-glyphs.spansFor(17, 21); // [{ row: 0, from: 6, to: 10 }]
+glyphs.anchors[0]![0]!;
+// { options: "options", row: 0, col: 0, index: 12, start: 0, end: 12 }
+glyphs.renderedCell(12); // { row: 0, col: 0 }
+glyphs.cursorIndex(0, 1); // 13
+[...glyphs.spansFor(12, 16)]; // [{ row: 0, from: 0, to: 4 }]
 ```
+
+`Glyphs.spansFor` returns `Spans`, a selection over the grid. Use `contains` for
+hit testing, `mapCells` to decorate selected cells, `equals` to compare run
+geometry, and `blit` to copy the runs to a terminal at an origin. Iterate the
+selection to inspect its individual runs.
 
 ## Colours and cell data
 

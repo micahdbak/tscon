@@ -29,7 +29,9 @@ describe("Glyphs compilation", () => {
 	test("anchors record their position and payload", () => {
 		const glyphs = new Glyphs(`${B}a0{Foo|bar}Foo`, 10);
 
-		expect(glyphs.anchors[0]).toEqual([{ options: "Foo|bar", row: 0, col: 0, index: 12 }]);
+		expect(glyphs.anchors[0]).toEqual([
+			{ options: "Foo|bar", row: 0, col: 0, index: 12, start: 0, end: 12 },
+		]);
 		expect(hex(glyphs)).toBe("101146,10116f,10116f,0,0,0,0,0,0,0");
 	});
 
@@ -90,28 +92,30 @@ describe("Glyphs compilation", () => {
 	test("anchors survive word wrap at the next row", () => {
 		const glyphs = new Glyphs(`aaa ${B}a0x`, 3);
 
-		expect(glyphs.anchors[0]).toEqual([{ options: null, row: 1, col: 0, index: 7 }]);
+		expect(glyphs.anchors[0]).toEqual([
+			{ options: null, row: 1, col: 0, index: 7, start: 4, end: 7 },
+		]);
 	});
 
 	test("an anchor captures the cell of the glyph that follows it", () => {
 		// past a colour escape
 		expect(new Glyphs(`${B}a0${B}f1x`, 10).anchors[0]).toEqual([
-			{ options: null, row: 0, col: 0, index: 6 },
+			{ options: null, row: 0, col: 0, index: 6, start: 0, end: 3 },
 		]);
 
 		// past a tab
 		expect(new Glyphs(`${B}a0\tx`, 10).anchors[0]).toEqual([
-			{ options: null, row: 0, col: 8, index: 4 },
+			{ options: null, row: 0, col: 8, index: 4, start: 0, end: 3 },
 		]);
 
 		// past a wrap break
 		expect(new Glyphs(`aa ${B}a0x`, 2).anchors[0]).toEqual([
-			{ options: null, row: 1, col: 0, index: 6 },
+			{ options: null, row: 1, col: 0, index: 6, start: 3, end: 6 },
 		]);
 
 		// with nothing following: the end of the last row
 		expect(new Glyphs(`ab${B}a0`, 10).anchors[0]).toEqual([
-			{ options: null, row: 0, col: 2, index: 5 },
+			{ options: null, row: 0, col: 2, index: 5, start: 2, end: 5 },
 		]);
 	});
 
@@ -297,21 +301,21 @@ describe("Glyphs positions", () => {
 		const glyphs = new Glyphs("aaaa bbbb", 5);
 
 		// within one row
-		expect(glyphs.spansFor(1, 3)).toEqual([{ row: 0, from: 1, to: 3 }]);
+		expect([...glyphs.spansFor(1, 3)]).toEqual([{ row: 0, from: 1, to: 3 }]);
 
 		// across the wrap break, merged over the eaten blank
-		expect(glyphs.spansFor(2, 6)).toEqual([
+		expect([...glyphs.spansFor(2, 6)]).toEqual([
 			{ row: 0, from: 2, to: 4 },
 			{ row: 1, from: 0, to: 1 },
 		]);
 
 		// escapes inside the range do not split the run
 		const escaped = new Glyphs(`aa${B}f1bb`, 80);
-		expect(escaped.spansFor(0, 6)).toEqual([{ row: 0, from: 0, to: 3 }]);
+		expect([...escaped.spansFor(0, 7)]).toEqual([{ row: 0, from: 0, to: 4 }]);
 
 		// a range that renders nowhere produces no spans
-		expect(new Glyphs("ab", 2).spansFor(5, 9)).toEqual([]);
-		expect(new Glyphs(`x${B}f1y`, 2).spansFor(1, 3)).toEqual([]);
+		expect([...new Glyphs("ab", 2).spansFor(5, 9)]).toEqual([]);
+		expect([...new Glyphs(`x${B}f1y`, 2).spansFor(1, 3)]).toEqual([]);
 	});
 
 	test("mapCells transforms cells and preserves everything else", () => {

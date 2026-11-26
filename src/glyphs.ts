@@ -3,7 +3,9 @@ import { TAB_WIDTH, layoutText } from "./wrap.ts";
 import type { TextLayout, TextOptions } from "./wrap.ts";
 import { Colour } from "./colour.ts";
 import { charCodeInCp437 } from "./cp437.ts";
-import { packCell, type Cell, type CellSpan } from "./cell.ts";
+import { packCell, type Cell } from "./cell.ts";
+import { Spans } from "./span.ts";
+import type { Span } from "./span.ts";
 import type { Rect } from "./rect.ts";
 
 /**
@@ -15,7 +17,9 @@ import type { Rect } from "./rect.ts";
  * the end of the last row when nothing follows. `options` is the escape's
  * `{...}` payload, or `null` when the braces are absent or empty.
  *
- * Group numbers and payloads are application data. See {@link Glyphs.anchors}.
+ * `start` and `end` delimit the escape itself in the source text, while
+ * `row`, `col`, and `index` describe the visible cell it captures. Group
+ * numbers and payloads are application data. See {@link Glyphs.anchors}.
  *
  * @example
  * ```ts
@@ -27,6 +31,8 @@ import type { Rect } from "./rect.ts";
  * g.anchors[0]![0]!.row;     // 0
  * g.anchors[0]![0]!.col;     // 0: where "F" renders
  * g.anchors[0]![0]!.index;   // 12: where "F" starts in the source
+ * g.anchors[0]![0]!.start;   // 0: the anchor's backslash
+ * g.anchors[0]![0]!.end;     // 12: after the anchor escape
  * ```
  */
 export type Anchor = {
@@ -38,6 +44,10 @@ export type Anchor = {
 	col: number;
 	/** Source character index of the captured glyph. */
 	index: number;
+	/** Source character index of the anchor's backslash. */
+	start: number;
+	/** One past the anchor escape's last source character. */
+	end: number;
 };
 
 /**
@@ -200,7 +210,16 @@ export class Glyphs {
 				const scan = scanEscapeAt(piece, i);
 
 				if (scan.kind === "anchor") {
-					const anchor: Anchor = { options: scan.options, row: 0, col: 0, index: 0 };
+					const offset = layout.starts[row] + i + scan.chars - 1;
+					const last = layout.source[offset] ?? source_index;
+					const anchor: Anchor = {
+						options: scan.options,
+						row: 0,
+						col: 0,
+						index: 0,
+						start: source_index,
+						end: last + 1,
+					};
 					const group = this.anchors[scan.group] ?? [];
 
 					group.push(anchor);
@@ -443,8 +462,8 @@ export class Glyphs {
 	/**
 	 * The cells a source range covers, as runs of columns per row.
 	 *
-	 * Returns one {@link CellSpan} per row containing a mapped cell. Escapes
-	 * and tabs inside a range do not split a run.
+	 * Returns one {@link Span} per row containing a mapped cell. Escapes and
+	 * tabs inside a range do not split a run.
 	 *
 	 * @example
 	 * ```ts
@@ -452,7 +471,7 @@ export class Glyphs {
 	 *
 	 * const g = new Glyphs("aaaa bbbb", 5);
 	 *
-	 * g.spansFor(2, 6);
+	 * [...g.spansFor(2, 6)];
 	 * // [{ row: 0, from: 2, to: 4 }, { row: 1, from: 0, to: 1 }]
 	 * ```
 	 *
@@ -463,15 +482,17 @@ export class Glyphs {
 	 * // escapes inside the range do not split the run
 	 * const g = new Glyphs("aa\\f1bb", 20);
 	 *
-	 * g.spansFor(0, 6);   // [{ row: 0, from: 0, to: 3 }]
+	 * [...g.spansFor(0, 7)];   // [{ row: 0, from: 0, to: 4 }]
 	 * ```
 	 *
-	 * @param start  First source character index of the range.
-	 * @param end    One past the last source character index.
-	 * @returns     The cell runs the range occupies.
+	 * @param start  First source character index. Negative values clamp to 0.
+	 * @param end    One past the last source character index. Values past the
+	 *               text clamp to its length.
+	 * @returns     The selected cell runs, as {@link Spans} over this grid. A
+	 *              range with no rendered cells produces no spans.
 	 */
-	spansFor(start: number, end: number): CellSpan[] {
-		const spans: CellSpan[] = [];
+	spansFor(start: number, end: number): Spans {
+		const spans: Span[] = [];
 
 		const from = Math.max(0, start);
 		const to = Math.min(end, this.source_to_cell.length);
@@ -494,7 +515,7 @@ export class Glyphs {
 			}
 		}
 
-		return spans;
+		return new Spans(this, spans);
 	}
 
 	/**

@@ -21,30 +21,6 @@ export type Cell = {
 };
 
 /**
- * A horizontal run of cells on one row, from column `from` (inclusive) to
- * column `to` (exclusive).
- *
- * This is the shape {@link Glyphs.spansFor} returns: a source range that
- * crosses a wrapped row break comes back as one span per row.
- *
- * @example
- * ```ts
- * import type { CellSpan } from "@micahdb/tscon";
- *
- * // columns 4, 5, and 6 of row 2
- * const span: CellSpan = { row: 2, from: 4, to: 7 };
- * ```
- */
-export type CellSpan = {
-	/** The row the run lies on. */
-	row: number;
-	/** First column of the run, inclusive. */
-	from: number;
-	/** One past the run's last column. */
-	to: number;
-};
-
-/**
  * The three byte fields in a packed terminal cell.
  *
  * @example
