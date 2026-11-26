@@ -32,7 +32,10 @@ export type CanvasOptions = {
  *
  * `"resize"` fires when the row or column count changes. `"wheel"` carries
  * a signed whole-row delta in `detail.rows`. `"keydown"` and `"keyup"`
- * carry a {@link Key} in `detail`.
+ * carry a {@link Key} in `detail`; they only fire while the host is
+ * focused, so keys aimed at other elements are never delivered here.
+ * While attached, the canvas consumes Ctrl/Cmd+A and Ctrl/Cmd+C so the
+ * page DOM beneath cannot be selected or copied.
  *
  * Use {@link Canvas.from} in a browser or supply a {@link CanvasHost}
  * and a WebGL2 context.
@@ -406,9 +409,22 @@ export class Canvas extends EventTarget {
 	}
 
 	private pressKey(key: Key): void {
-		this.dispatchEvent(new CustomEvent<Key>("keydown", {
-			detail: key,
-		}));
+		if (this.host.focused) {
+			this.dispatchEvent(new CustomEvent<Key>("keydown", {
+				detail: key,
+			}));
+		}
+
+		// Ctrl/Cmd+A and Ctrl/Cmd+C act on the page DOM, not the canvas.
+		const name = key.key.toLowerCase();
+		const selection_shortcut = (name === "a" || name === "c")
+			&& (key.ctrl || key.meta)
+			&& !key.alt
+			&& !key.shift;
+
+		if (selection_shortcut) {
+			key.prevent_default();
+		}
 
 		if (key.default_prevented) {
 			return;
@@ -424,9 +440,11 @@ export class Canvas extends EventTarget {
 	}
 
 	private releaseKey(key: Key): void {
-		this.dispatchEvent(new CustomEvent<Key>("keyup", {
-			detail: key,
-		}));
+		if (this.host.focused) {
+			this.dispatchEvent(new CustomEvent<Key>("keyup", {
+				detail: key,
+			}));
+		}
 	}
 
 	private dispatchWheel(rows: number): void {

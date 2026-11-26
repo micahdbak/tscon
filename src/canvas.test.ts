@@ -241,8 +241,47 @@ describe("Canvas", () => {
 		host.keyDown("j");
 
 		expect(wheel).toEqual([]);
-		expect(keys).toEqual(["j"]);
+		expect(keys).toEqual([]);
 		expect(host.default_prevented).toBe(false);
+	});
+
+	test("keys are only delivered while the canvas is focused", () => {
+		const { host, keys } = harness();
+
+		host.keyDown("a");
+		host.keyUp("a");
+
+		expect(keys).toEqual([]);
+
+		host.focus();
+		host.keyDown("a");
+		host.keyUp("a");
+
+		expect(keys).toEqual(["a"]);
+
+		host.blur();
+		host.keyDown("b");
+
+		expect(keys).toEqual(["a"]);
+	});
+
+	test("select-all and copy shortcuts are consumed", () => {
+		const { host, keys } = harness();
+
+		host.keyDown("a", { ctrl: true });
+		expect(host.default_prevented).toBe(true);
+
+		host.keyDown("c", { meta: true });
+		expect(host.default_prevented).toBe(true);
+
+		host.keyDown("a", { ctrl: true, shift: true });
+		expect(host.default_prevented).toBe(false);
+
+		host.focus();
+		host.keyDown("a", { ctrl: true });
+
+		expect(keys).toEqual(["a"]);
+		expect(host.default_prevented).toBe(true);
 	});
 
 	test("clear resets the cursor class", () => {
