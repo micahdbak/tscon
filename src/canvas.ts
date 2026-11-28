@@ -280,6 +280,31 @@ export class Canvas extends EventTarget {
 	}
 
 	/**
+	 * Read one entry of the active palette as normalised RGB floats.
+	 *
+	 * The channels are in the same 0-1 form as {@link palette}, so they can
+	 * be passed straight to WebGL calls such as `clearColor`.
+	 *
+	 * @example
+	 * ```ts
+	 * const [r, g, b] = canvas.paletteColour(Colour.BG);
+	 * gl.clearColor(r, g, b, 1);
+	 * ```
+	 *
+	 * @param colour  Palette entry to read.
+	 * @returns  Three floats in the range 0-1, in red, green, blue order.
+	 */
+	paletteColour(colour: Colour): readonly [number, number, number] {
+		const offset = colour * 3;
+
+		return [
+			this.palette[offset]!,
+			this.palette[offset + 1]!,
+			this.palette[offset + 2]!,
+		];
+	}
+
+	/**
 	 * Clear rendered pixels to {@link Colour.BG} and reset {@link class_name}.
 	 *
 	 * Call before drawing a frame. Use {@link Terminal.clear} to reset cells.

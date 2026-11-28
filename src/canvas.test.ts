@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { Canvas } from "./canvas.ts";
 import { TestCanvasHost } from "./canvas_host.ts";
-import { DEFAULT_COLOURS, Palette } from "./colour.ts";
+import { Colour, DEFAULT_COLOURS, Palette } from "./colour.ts";
 import type { Key } from "./input.ts";
 import { createHeadlessGL2 } from "./headless_gl.ts";
 
@@ -126,6 +126,24 @@ describe("Canvas", () => {
 		expect(canvas.palette[0]).toBeCloseTo(129 / 255);
 		expect(canvas.palette[1]).toBe(0);
 		expect(canvas.palette[2]).toBe(1);
+	});
+
+	test("paletteColour reads the active palette as normalised floats", () => {
+		const { canvas } = harness();
+
+		canvas.setPalette(new Palette([[10, 20, 30], [40, 50, 60]]));
+
+		const [r, g, b] = canvas.paletteColour(Colour.BLACK);
+
+		expect(r).toBeCloseTo(10 / 255);
+		expect(g).toBeCloseTo(20 / 255);
+		expect(b).toBeCloseTo(30 / 255);
+
+		const [bg_r, bg_g, bg_b] = canvas.paletteColour(Colour.BG);
+
+		expect(bg_r).toBeCloseTo(DEFAULT_COLOURS[Colour.BG]![0] / 0xff);
+		expect(bg_g).toBeCloseTo(DEFAULT_COLOURS[Colour.BG]![1] / 0xff);
+		expect(bg_b).toBeCloseTo(DEFAULT_COLOURS[Colour.BG]![2] / 0xff);
 	});
 
 	test("recomputes the grid and dispatches resize", () => {
