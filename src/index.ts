@@ -1,4 +1,4 @@
-export { Canvas } from "./canvas/index.ts";
+export { Canvas, Click } from "./canvas/index.ts";
 export type { CanvasHost, CanvasHostEventMap } from "./canvas/index.ts";
 export type { CanvasOptions } from "./canvas/index.ts";
 export type { Key, WheelMode } from "./canvas/index.ts";

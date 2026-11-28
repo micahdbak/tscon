@@ -1,6 +1,13 @@
 import { Colour, DEFAULT_COLOURS, Palette } from "../colour.ts";
 import { type CanvasHost, WebCanvasHost } from "./canvas_host.ts";
-import { type Key, pointerCell, scrollRowsForKey, type WheelMode, wheelRows } from "./input.ts";
+import { cancelClick, Click, finishClick, startClick } from "./click.ts";
+import {
+	type Key,
+	pointerCell,
+	scrollRowsForKey,
+	type WheelMode,
+	wheelRows,
+} from "./input.ts";
 import { loadModernDosTexture } from "./moderndos.ts";
 
 const PAGE_SHORTCUT_KEYS = new Set(["a", "c", "f", "g"]);
@@ -27,6 +34,13 @@ export type CanvasOptions = {
 	 * than one 8x16 cell always use the full-canvas grid.
 	 */
 	stretch?: boolean;
+
+	/**
+	 * Handle pointer, wheel, focus, and keyboard input. Defaults to true.
+	 * When false, the canvas does not listen for input, prevents no browser
+	 * defaults, and leaves its mouse and keyboard state unset.
+	 */
+	interactive?: boolean;
 };
 
 /**
@@ -35,14 +49,15 @@ export type CanvasOptions = {
  * `"resize"` fires when the row or column count changes. `"wheel"` carries
  * a signed whole-row delta in `detail.rows`. `"keydown"` and `"keyup"`
  * carry a {@link Key} in `detail`; they only fire while the host is
- * focused, so keys aimed at other elements are never delivered here. The
- * pointer focuses the canvas when it is pressed; call {@link focus} to
- * hand it the keyboard on boot. While focused, the canvas consumes
+ * focused, so keys aimed at other elements are never delivered here. When
+ * interactive, the pointer focuses the canvas when pressed; call {@link focus}
+ * to take the keyboard on boot. While focused, the canvas consumes
  * Ctrl/Cmd+A/C/F/G so page selection, copy, and find do not act on the DOM
  * beneath it.
  *
  * Use {@link Canvas.from} in a browser or supply a {@link CanvasHost}
- * and a WebGL2 context.
+ * and a WebGL2 context. Set {@link CanvasOptions.interactive} to false for a
+ * render-only canvas.
  *
  * @example
  * ```ts
@@ -63,10 +78,13 @@ export class Canvas extends EventTarget {
 	/** The WebGL2 rendering context this canvas draws through. */
 	readonly gl: WebGL2RenderingContext;
 
+	/** Whether this canvas handles input events. See {@link CanvasOptions.interactive}. */
+	readonly interactive: boolean;
+
 	private readonly unsubscribers: (() => void)[] = [];
 	private readonly stretch: boolean;
 
-	private wheel_px: number;
+	private wheel_px = 0;
 	private grid_width = 0;
 	private grid_height = 0;
 
@@ -85,30 +103,13 @@ export class Canvas extends EventTarget {
 	/** Width of a single cell in device pixels. */
 	actual_cell_width = 0;
 
-	/**
-	 * Name of the component that currently "owns" the mouse, or `""` when
-	 * unclaimed. Components doing drag-style interaction set this to a
-	 * unique name when a press begins inside their region and clear it
-	 * when the press ends, so other components can avoid stealing the
-	 * gesture mid-drag.
-	 */
-	mouse_owner = "";
-
 	/** Cell row the pointer is over, or `undefined` outside the grid. */
 	mouse_row: number | undefined = undefined;
 	/** Cell column the pointer is over, or `undefined` outside the grid. */
 	mouse_col: number | undefined = undefined;
 
-	/** `true` while a pointer button is held down on the canvas. */
-	mouse_down = false;
-	/**
-	 * Set on pointer release. Reset it after processing the click in a frame.
-	 */
-	mouse_click = false;
-	/** Cell row where the current press started, or `undefined`. */
-	mouse_down_row: number | undefined = undefined;
-	/** Cell column where the current press started, or `undefined`. */
-	mouse_down_col: number | undefined = undefined;
+	/** Press, release, ownership, and click consumption state. */
+	readonly click = new Click();
 
 	/**
 	 * The active 18-colour palette as normalised `[R, G, B]` floats
@@ -116,10 +117,7 @@ export class Canvas extends EventTarget {
 	 */
 	readonly palette: Float32Array;
 
-	/**
-	 * The built-in 8x16 bitmap font as a WebGL2 integer texture.
-	 * This is the Modern DOS CP437 font baked into tscon.
-	 */
+	/** The built-in 8x16 Modern DOS CP437 font texture. */
 	bitmap_font: WebGLTexture;
 
 	/**
@@ -128,13 +126,9 @@ export class Canvas extends EventTarget {
 	 * {@link Renderer.use_user_font}. Codes 176-223 use {@link bitmap_font}.
 	 * Use {@link renderCp437} to generate an atlas.
 	 */
-	user_font: WebGLTexture | null;
+	user_font: WebGLTexture | null = null;
 
-	/**
-	 * CSS class name for the body cursor, set by components during a frame
-	 * (e.g. `"pointer"` when hovering a link) and reset to `""` on
-	 * {@link clear}.
-	 */
+	/** Body CSS class set during a frame and reset by {@link clear}. */
 	class_name = "";
 
 	/**
@@ -148,7 +142,7 @@ export class Canvas extends EventTarget {
 	 *
 	 * @param host     Browser or test surface to read from.
 	 * @param gl       WebGL2 context to draw through.
-	 * @param options  Initial palette and other canvas options.
+	 * @param options  Canvas options.
 	 */
 	constructor(
 		host: CanvasHost,
@@ -159,31 +153,34 @@ export class Canvas extends EventTarget {
 		this.host = host;
 		this.gl = gl;
 		this.stretch = options.stretch ?? false;
-		this.wheel_px = 0;
+		this.interactive = options.interactive ?? true;
+		this.host.interactive = this.interactive;
 		this.palette = (options.palette ?? new Palette(DEFAULT_COLOURS)).toFloats();
 		this.bitmap_font = loadModernDosTexture(gl);
-		this.user_font = null;
 
 		this.resize();
 
-		this.unsubscribers.push(
-			host.on("resize", () => this.resize()),
-			host.on("pointermove", (event) => {
-				this.movePointer(event.x, event.y);
-			}),
-			host.on("pointerdown", (event) => {
-				this.press(event.x, event.y);
-			}),
-			host.on("pointerup", () => this.release(true)),
-			host.on("pointercancel", () => this.release(false)),
-			host.on("pointerleave", () => this.release(false)),
-			host.on("wheel", (event) => {
-				this.scroll(event.delta_mode, event.delta_y);
-			}),
-			host.on("keydown", (event) => this.pressKey(event)),
-			host.on("keyup", (event) => this.releaseKey(event)),
-			host.on("blur", () => this.cancelPress()),
-		);
+		this.unsubscribers.push(host.on("resize", () => this.resize()));
+
+		if (this.interactive) {
+			this.unsubscribers.push(
+				host.on("pointermove", (event) => {
+					this.movePointer(event.x, event.y);
+				}),
+				host.on("pointerdown", (event) => {
+					this.press(event.x, event.y);
+				}),
+				host.on("pointerup", () => this.release(true)),
+				host.on("pointercancel", () => this.release(false)),
+				host.on("pointerleave", () => this.release(false)),
+				host.on("wheel", (event) => {
+					this.scroll(event.delta_mode, event.delta_y);
+				}),
+				host.on("keydown", (event) => this.pressKey(event)),
+				host.on("keyup", (event) => this.releaseKey(event)),
+				host.on("blur", () => this.cancelPress()),
+			);
+		}
 	}
 
 	/**
@@ -197,7 +194,7 @@ export class Canvas extends EventTarget {
 	 * ```
 	 *
 	 * @param element  The `<canvas>` element to render into.
-	 * @param options  Initial palette and other canvas options.
+	 * @param options  Canvas options.
 	 * @returns        A canvas backed by the element.
 	 * @throws         When a WebGL2 context cannot be acquired.
 	 */
@@ -237,10 +234,8 @@ export class Canvas extends EventTarget {
 	/**
 	 * Whether the current press started inside the given cell rectangle.
 	 *
-	 * Use this for click hit-testing: it checks where the press began
-	 * ({@link mouse_down_row}/{@link mouse_down_col}), not where the
-	 * pointer is now, so a drag that leaves the rectangle still counts as
-	 * a click on it.
+	 * Uses the press cell recorded on {@link click}, so a drag that leaves the
+	 * rectangle still counts.
 	 *
 	 * @param row   Top row of the rectangle.
 	 * @param col   Left column of the rectangle.
@@ -254,13 +249,16 @@ export class Canvas extends EventTarget {
 		rows: number,
 		cols: number,
 	): boolean {
+		const down_row = this.click.down_row;
+		const down_col = this.click.down_col;
+
 		return (
-			this.mouse_down_row !== undefined &&
-			this.mouse_down_col !== undefined &&
-			this.mouse_down_row >= row &&
-			this.mouse_down_row < row + rows &&
-			this.mouse_down_col >= col &&
-			this.mouse_down_col < col + cols
+			down_row !== undefined &&
+			down_col !== undefined &&
+			down_row >= row &&
+			down_row < row + rows &&
+			down_col >= col &&
+			down_col < col + cols
 		);
 	}
 
@@ -332,7 +330,7 @@ export class Canvas extends EventTarget {
 		this.class_name = "";
 	}
 
-	/** Stop listening to the host and release it. */
+	/** Remove input listeners and dispose the host. */
 	dispose(): void {
 		for (const unsubscribe of this.unsubscribers) {
 			unsubscribe();
@@ -343,9 +341,9 @@ export class Canvas extends EventTarget {
 	}
 
 	/**
-	 * Focus the input element so this canvas receives key events. Pages that
-	 * want the keyboard immediately can call this once on boot; the pointer
-	 * focuses the element on its own.
+	 * Focus the input element. Pages that want the keyboard immediately can call
+	 * this once on boot; with interactive input enabled, the pointer focuses the
+	 * element on its own.
 	 */
 	focus(): void {
 		this.host.focus();
@@ -382,13 +380,9 @@ export class Canvas extends EventTarget {
 		this.actual_cell_width = this.grid_width / cols;
 		gl.viewport(0, this.height - this.grid_height, this.grid_width, this.grid_height);
 
-		this.mouse_owner = "";
+		cancelClick(this.click);
 		this.mouse_row = undefined;
 		this.mouse_col = undefined;
-		this.mouse_down = false;
-		this.mouse_click = false;
-		this.mouse_down_row = undefined;
-		this.mouse_down_col = undefined;
 
 		if (rows !== this.rows || cols !== this.cols) {
 			this.rows = rows;
@@ -414,22 +408,19 @@ export class Canvas extends EventTarget {
 
 	private press(x: number, y: number): void {
 		this.movePointer(x, y);
-		this.mouse_down = true;
-		this.mouse_down_row = this.mouse_row;
-		this.mouse_down_col = this.mouse_col;
+		startClick(this.click, this.mouse_row, this.mouse_col);
 	}
 
 	private release(click: boolean): void {
-		this.mouse_down = false;
-
 		if (click) {
-			this.mouse_click = true;
+			finishClick(this.click, this.mouse_row, this.mouse_col);
+		} else {
+			cancelClick(this.click);
 		}
 	}
 
 	private cancelPress(): void {
-		this.mouse_down = false;
-		this.mouse_click = false;
+		cancelClick(this.click);
 	}
 
 	private scroll(delta_mode: WheelMode, delta_y: number): void {

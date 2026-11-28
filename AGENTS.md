@@ -86,8 +86,10 @@ embedding them.
 Canvas, terminal, and renderer tests are headless. Use
 `new Canvas(new TestCanvasHost(...), createHeadlessGL2())` with the real
 `Terminal` and `Renderer`. `TestCanvasHost` injects size, focus, pointer,
-wheel, key, and resize events; `HeadlessGL2` is a no-op WebGL2 context. Do not
-add browser DOM mocks or an alternate terminal implementation.
+wheel, key, and resize events; `HeadlessGL2` is a no-op WebGL2 context. Pointer
+tests assert on `canvas.click` and call `canvas.click.clear()` at the end of
+each simulated frame. Do not add browser DOM mocks or an alternate terminal
+implementation.
 
 Run, in order, and leave each clean:
 

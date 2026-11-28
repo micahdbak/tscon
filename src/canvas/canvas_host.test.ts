@@ -23,6 +23,9 @@ function fakeElement() {
 		height: 0,
 		tabIndex: 0,
 		hasAttribute: () => false,
+		removeAttribute: () => {
+			element.tabIndex = -1;
+		},
 		setPointerCapture: () => {
 			captures++;
 		},
@@ -282,6 +285,42 @@ describe("WebCanvasHost", () => {
 
 		expect(host.css_width).toBe(800);
 		expect(element.width).toBe(2400);
+	});
+
+	test("interactive false leaves browser defaults and focus alone", () => {
+		const window = fakeWindow();
+		(globalThis as Record<string, unknown>).window = window;
+
+		const element = fakeElement();
+		const host = new WebCanvasHost(element as unknown as HTMLCanvasElement);
+		const keys: CanvasHostEventMap["keydown"][] = [];
+
+		host.on("keydown", (event) => keys.push(event));
+		host.interactive = false;
+
+		const pointer = pointerEvent("pointerdown", 0, 0);
+		element.dispatchEvent(pointer);
+
+		expect(pointer.defaultPrevented).toBe(false);
+		expect(host.focused).toBe(false);
+		expect(element.captures()).toBe(0);
+		expect(element.tabIndex).toBe(-1);
+
+		const wheel = Object.assign(new Event("wheel", { cancelable: true }), {
+			deltaMode: 0,
+			deltaY: 16,
+		});
+		element.dispatchEvent(wheel);
+		expect(wheel.defaultPrevented).toBe(false);
+
+		const menu = new Event("contextmenu", { cancelable: true });
+		element.dispatchEvent(menu);
+		expect(menu.defaultPrevented).toBe(false);
+
+		window.dispatchEvent(keyEvent("j"));
+		expect(keys).toEqual([]);
+
+		host.dispose();
 	});
 
 	test("Canvas.from builds a canvas from the element", () => {

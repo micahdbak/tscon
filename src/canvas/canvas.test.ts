@@ -1,13 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import { Colour, DEFAULT_COLOURS, Palette } from "../colour.ts";
 import { createHeadlessGL2 } from "../headless_gl.ts";
-import { Canvas } from "./canvas.ts";
+import { Canvas, type CanvasOptions } from "./canvas.ts";
 import { TestCanvasHost } from "./canvas_host.ts";
 import type { Key } from "./input.ts";
 
-function harness(css_width = 800, css_height = 480) {
+function harness(css_width = 800, css_height = 480, options: CanvasOptions = {}) {
 	const host = new TestCanvasHost({ css_width, css_height });
-	const canvas = new Canvas(host, createHeadlessGL2());
+	const canvas = new Canvas(host, createHeadlessGL2(), options);
 	const wheel: number[] = [];
 	const keys: string[] = [];
 	const resized: number[] = [];
@@ -180,15 +180,92 @@ describe("Canvas", () => {
 		host.pointerMove(point.x, point.y);
 		host.pointerDown(point.x, point.y);
 
-		expect(canvas.mouse_down).toBe(true);
-		expect(canvas.mouse_down_row).toBe(3);
-		expect(canvas.mouse_down_col).toBe(4);
 		expect(canvas.mouseDownAt(3, 4, 1, 1)).toBe(true);
+		expect(canvas.click.pressed()).toBe(true);
+		expect(canvas.click.down_row).toBe(3);
+		expect(canvas.click.down_col).toBe(4);
+		expect(canvas.click.row).toBeUndefined();
+		expect(canvas.click.consume()).toBe(false);
 
 		host.pointerUp(point.x, point.y);
 
-		expect(canvas.mouse_down).toBe(false);
-		expect(canvas.mouse_click).toBe(true);
+		expect(canvas.click.pressed()).toBe(false);
+		expect(canvas.click.row).toBe(3);
+		expect(canvas.click.col).toBe(4);
+		expect(canvas.click.down_row).toBe(3);
+		expect(canvas.click.down_col).toBe(4);
+	});
+
+	test("clear keeps an incomplete click", () => {
+		const { host, canvas } = harness();
+		const point = cellPoint(host, canvas, 3, 4);
+
+		host.pointerMove(point.x, point.y);
+		host.pointerDown(point.x, point.y);
+		canvas.click.clear();
+
+		expect(canvas.click.down_row).toBe(3);
+		expect(canvas.click.row).toBeUndefined();
+
+		host.pointerUp(point.x, point.y);
+	});
+
+	test("click tokens are consumed once and cleared at frame end", () => {
+		const { host, canvas } = harness();
+		const point = cellPoint(host, canvas, 3, 4);
+
+		host.pointerMove(point.x, point.y);
+		host.pointerDown(point.x, point.y);
+		host.pointerUp(point.x, point.y);
+
+		const click = canvas.click;
+
+		expect(click.consumed).toBe(false);
+		expect(click.consume()).toBe(true);
+		expect(click.consumed).toBe(true);
+		expect(click.consume()).toBe(false);
+
+		click.clear();
+
+		expect(click.row).toBeUndefined();
+		expect(click.consumed).toBe(false);
+	});
+
+	test("claimed gestures suppress clicks", () => {
+		const { host, canvas } = harness();
+		const point = cellPoint(host, canvas, 3, 4);
+
+		host.pointerMove(point.x, point.y);
+		host.pointerDown(point.x, point.y);
+
+		expect(canvas.click.claim("drag")).toBe(true);
+		expect(canvas.click.claim("other")).toBe(false);
+		expect(canvas.click.owner).toBe("drag");
+
+		host.pointerUp(point.x, point.y);
+
+		expect(canvas.click.owner).toBe("drag");
+		expect(canvas.click.consume()).toBe(false);
+
+		canvas.click.clear();
+
+		expect(canvas.click.owner).toBe("");
+	});
+
+	test("released ownership allows a click", () => {
+		const { host, canvas } = harness();
+		const point = cellPoint(host, canvas, 3, 4);
+
+		host.pointerMove(point.x, point.y);
+		host.pointerDown(point.x, point.y);
+
+		expect(canvas.click.claim("drag")).toBe(true);
+		canvas.click.release("drag");
+
+		host.pointerUp(point.x, point.y);
+
+		expect(canvas.click.owner).toBe("");
+		expect(canvas.click.consume()).toBe(true);
 	});
 
 	test("accumulates pixel wheel deltas into whole rows", () => {
@@ -313,6 +390,28 @@ describe("Canvas", () => {
 		expect(host.default_prevented).toBe(true);
 
 		host.keyDown("a", { ctrl: true, shift: true });
+		expect(host.default_prevented).toBe(false);
+	});
+
+	test("interactive false ignores input and leaves mouse state unset", () => {
+		const { host, canvas, wheel, keys } = harness(800, 480, { interactive: false });
+		const point = cellPoint(host, canvas, 3, 4);
+
+		host.pointerMove(point.x, point.y);
+		host.pointerDown(point.x, point.y);
+		host.pointerUp(point.x, point.y);
+		host.wheel(16);
+		host.focus();
+		host.keyDown("j");
+		host.keyUp("j");
+
+		expect(canvas.interactive).toBe(false);
+		expect(canvas.mouse_row).toBeUndefined();
+		expect(canvas.mouse_col).toBeUndefined();
+		expect(canvas.click.pressed()).toBe(false);
+		expect(canvas.click.consume()).toBe(false);
+		expect(wheel).toEqual([]);
+		expect(keys).toEqual([]);
 		expect(host.default_prevented).toBe(false);
 	});
 

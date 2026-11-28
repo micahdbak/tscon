@@ -72,6 +72,12 @@ export interface CanvasHost {
 	readonly focused: boolean;
 
 	/**
+	 * Whether input events should suppress browser default actions. Canvas sets
+	 * this from {@link CanvasOptions.interactive}; custom hosts should honor it.
+	 */
+	interactive?: boolean;
+
+	/**
 	 * Focus the input element, so key events reach the canvas.
 	 *
 	 * @example
@@ -178,14 +184,25 @@ export class WebCanvasHost extends CanvasHostBase {
 
 	private readonly element_resize: ResizeObserver;
 
+	private _interactive = true;
+	private added_tab_index = false;
+
 	private written_width = 0;
 	private written_height = 0;
 
 	private readonly on_pointer_move = (event: PointerEvent): void => {
+		if (!this.interactive) {
+			return;
+		}
+
 		this.emit("pointermove", this.point(event.clientX, event.clientY));
 	};
 
 	private readonly on_pointer_down = (event: PointerEvent): void => {
+		if (!this.interactive) {
+			return;
+		}
+
 		event.preventDefault();
 
 		// preventDefault suppresses the browser's implicit focus, so ask for it
@@ -198,18 +215,34 @@ export class WebCanvasHost extends CanvasHostBase {
 	};
 
 	private readonly on_pointer_up = (event: PointerEvent): void => {
+		if (!this.interactive) {
+			return;
+		}
+
 		this.emit("pointerup", this.point(event.clientX, event.clientY));
 	};
 
 	private readonly on_pointer_cancel = (): void => {
+		if (!this.interactive) {
+			return;
+		}
+
 		this.emit("pointercancel", {});
 	};
 
 	private readonly on_pointer_leave = (): void => {
+		if (!this.interactive) {
+			return;
+		}
+
 		this.emit("pointerleave", {});
 	};
 
 	private readonly on_wheel = (event: WheelEvent): void => {
+		if (!this.interactive) {
+			return;
+		}
+
 		event.preventDefault();
 
 		const mode = event.deltaMode === 1 || event.deltaMode === 2
@@ -223,7 +256,7 @@ export class WebCanvasHost extends CanvasHostBase {
 	};
 
 	private readonly on_key_down = (event: KeyboardEvent): void => {
-		if (this.is_form_target(event.target)) {
+		if (!this.interactive || this.is_form_target(event.target)) {
 			return;
 		}
 
@@ -231,7 +264,7 @@ export class WebCanvasHost extends CanvasHostBase {
 	};
 
 	private readonly on_key_up = (event: KeyboardEvent): void => {
-		if (this.is_form_target(event.target)) {
+		if (!this.interactive || this.is_form_target(event.target)) {
 			return;
 		}
 
@@ -253,25 +286,25 @@ export class WebCanvasHost extends CanvasHostBase {
 	};
 
 	private readonly on_context_menu = (event: MouseEvent): void => {
+		if (!this.interactive) {
+			return;
+		}
+
 		event.preventDefault();
 	};
 
 	/**
 	 * Create a host for the given element.
 	 *
-	 * Makes the element focusable when it has no `tabindex`, observes its
-	 * size, and attaches normalized input listeners.
+	 * When interactive, makes the element focusable when it has no `tabindex`.
+	 * Observes its size and attaches normalized input listeners.
 	 *
 	 * @param element  The `<canvas>` element to observe.
 	 */
 	constructor(element: HTMLCanvasElement) {
 		super();
 		this.element = element;
-
-		if (!element.hasAttribute("tabindex")) {
-			element.tabIndex = 0;
-		}
-
+		this.interactive = true;
 		this.resize();
 
 		this.element_resize = new ResizeObserver(() => this.resize());
@@ -313,6 +346,26 @@ export class WebCanvasHost extends CanvasHostBase {
 		this.element.removeEventListener("blur", this.on_blur);
 
 		super.dispose();
+	}
+
+	/**
+	 * Whether this host suppresses default actions for input events and keeps
+	 * the element focusable. Canvas sets it from CanvasOptions.interactive.
+	 */
+	get interactive(): boolean {
+		return this._interactive;
+	}
+
+	set interactive(value: boolean) {
+		this._interactive = value;
+
+		if (value && !this.element.hasAttribute("tabindex")) {
+			this.element.tabIndex = 0;
+			this.added_tab_index = true;
+		} else if (!value && this.added_tab_index) {
+			this.element.removeAttribute("tabindex");
+			this.added_tab_index = false;
+		}
 	}
 
 	/**
@@ -430,6 +483,9 @@ export class WebCanvasHost extends CanvasHostBase {
  * ```
  */
 export class TestCanvasHost extends CanvasHostBase {
+	/** Whether the canvas should handle input events. Canvas sets this. */
+	interactive = true;
+
 	/** Whether the last injected key event called `prevent_default`. */
 	default_prevented = false;
 
