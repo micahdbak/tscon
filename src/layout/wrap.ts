@@ -9,11 +9,11 @@ import { scanEscapeAt } from "./escape.ts";
  *
  * @example
  * ```ts
- * import { Wrap, textToLines } from "@micahdb/tscon";
+ * import * as tscon from "@micahdb/tscon";
  *
- * textToLines("hello world", 5, { wrap: Wrap.WORD });     // ["hello", "world"]
- * textToLines("hello world", 5, { wrap: Wrap.TRUNCATE }); // ["hello"]
- * textToLines("hello world", 5, { wrap: Wrap.HARD });     // ["hello", " worl", "d"]
+ * tscon.textToLines("hello world", 5, { wrap: tscon.Wrap.WORD });     // ["hello", "world"]
+ * tscon.textToLines("hello world", 5, { wrap: tscon.Wrap.TRUNCATE }); // ["hello"]
+ * tscon.textToLines("hello world", 5, { wrap: tscon.Wrap.HARD });     // ["hello", " worl", "d"]
  * ```
  */
 export enum Wrap {
@@ -27,12 +27,12 @@ export enum Wrap {
  *
  * @example
  * ```ts
- * import { TAB_WIDTH, Glyphs } from "@micahdb/tscon";
+ * import * as tscon from "@micahdb/tscon";
  *
  * // "a" at column 0, a tab stop at column 8, "b" at column 8
- * const g = new Glyphs("a\tb", 80);
+ * const g = new tscon.Glyphs("a\tb", 80);
  *
- * g.cursorCell(2);      // { row: 0, col: TAB_WIDTH }
+ * g.cursorCell(2);      // { row: 0, col: tscon.TAB_WIDTH }
  * ```
  */
 export const TAB_WIDTH = 8;
@@ -43,9 +43,9 @@ export const TAB_WIDTH = 8;
  *
  * @example
  * ```ts
- * import { Glyphs, Wrap } from "@micahdb/tscon";
+ * import * as tscon from "@micahdb/tscon";
  *
- * const g = new Glyphs("plain text", 80, { wrap: Wrap.HARD, raw: true });
+ * const g = new tscon.Glyphs("plain text", 80, { wrap: tscon.Wrap.HARD, raw: true });
  * ```
  */
 export type TextOptions = {
@@ -63,17 +63,57 @@ export type TextOptions = {
 	raw?: boolean;
 };
 
-// the laid-out rows and where each begins, for Glyphs to compile from
+/**
+ * The result of {@link layoutText}: visible rows and source offset maps.
+ *
+ * `pieces` holds each row with its escapes intact. `starts[i]` is the index
+ * of that row in the joined text after line continuations are removed.
+ * `source[j]` is the original source index of joined-text character `j`.
+ *
+ * @example
+ * ```ts
+ * import * as tscon from "@micahdb/tscon";
+ *
+ * const layout = tscon.layoutText("hello world", 5);
+ *
+ * layout.pieces; // ["hello", "world"]
+ * layout.starts; // [0, 6]
+ * ```
+ */
 export type TextLayout = {
-	/** The laid-out visible rows, escapes preserved. */
+	/** The laid-out rows, escapes preserved. */
 	pieces: string[];
-	/** Index of each piece's first character in the joined text. */
+	/** Index of each row's first character in the joined text. */
 	starts: number[];
-	/** Original source index of each remaining source character. */
+	/** Original source index of each joined-text character. */
 	source: number[];
 };
 
-// Shared layout pass for textToLines and Glyphs.
+/**
+ * Lay `text` out into rows and return the rows with source offsets.
+ *
+ * {@link textToLines} returns only {@link TextLayout.pieces}. Use this
+ * function when you need to map a row or character back to the source.
+ * Escapes take no columns unless `raw` is set. Newlines end a row, a
+ * backslash before a newline joins two rows, and tabs advance to the next
+ * {@link TAB_WIDTH} stop.
+ *
+ * @example
+ * ```ts
+ * import * as tscon from "@micahdb/tscon";
+ *
+ * const layout = tscon.layoutText("hello world", 5, { wrap: tscon.Wrap.WORD });
+ *
+ * layout.pieces; // ["hello", "world"]
+ * layout.starts; // [0, 6]
+ * ```
+ *
+ * @param text  The text to lay out, possibly with escape sequences.
+ * @param cols  Maximum visible columns per row. If `<= 0`, empty arrays are
+ *              returned.
+ * @param opts  Layout options. Defaults to word wrap with live escapes.
+ * @returns     Rows, their starts, and the source map.
+ */
 export function layoutText(
 	text: string,
 	cols: number,
@@ -112,16 +152,17 @@ export function layoutText(
  * handled per {@link TextOptions.wrap}.
  *
  * Each returned line still contains its escape sequences, so it can be
- * passed back into tscon or rendered later. Use {@link Glyphs} when you want
- * cells rather than strings.
+ * passed back into tscon or rendered later. Use {@link layoutText} for row
+ * starts and source offsets, or {@link Glyphs} when you want cells rather
+ * than strings.
  *
  * @example
  * ```ts
- * import { textToLines, Wrap } from "@micahdb/tscon";
+ * import * as tscon from "@micahdb/tscon";
  *
- * textToLines("hello world", 5);                       // ["hello", "world"]
- * textToLines("hello world", 5, { wrap: Wrap.TRUNCATE }); // ["hello"]
- * textToLines("a\tb", 80);                             // ["a\tb"]
+ * tscon.textToLines("hello world", 5);                       // ["hello", "world"]
+ * tscon.textToLines("hello world", 5, { wrap: tscon.Wrap.TRUNCATE }); // ["hello"]
+ * tscon.textToLines("a\tb", 80);                             // ["a\tb"]
  * ```
  *
  * @param text  The text to lay out, possibly with escape sequences.
@@ -139,9 +180,7 @@ export function textToLines(
 	return layoutText(text, cols, opts).pieces;
 }
 
-/**
- * Join continued lines and keep each surviving character's source index.
- */
+// Join continued lines and keep each surviving character's source index.
 function stripContinuations(text: string): { text: string; source: number[] } {
 	let stripped = "";
 	const source: number[] = [];
@@ -165,11 +204,7 @@ function stripContinuations(text: string): { text: string; source: number[] } {
 	return { text: stripped, source };
 }
 
-/**
- * Skips the blank run beginning at `start` (plus one following newline)
- * and returns the index of its last character, or -1 when the run
- * reaches the end of the text.
- */
+// Skip the blank run at `start`; return its last index, or -1 at the end.
 function skipBlankRun(text: string, start: number): number {
 	while (start < text.length && (text[start] === " " || text[start] === "\t")) {
 		start++;

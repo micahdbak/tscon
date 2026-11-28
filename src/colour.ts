@@ -7,9 +7,9 @@
  *
  * @example
  * ```ts
- * import { Colour, packCell } from "@micahdb/tscon";
+ * import * as tscon from "@micahdb/tscon";
  *
- * const cell = packCell(65, Colour.BRIGHT_BLUE, Colour.BG);
+ * const cell = tscon.packCell(65, tscon.Colour.BRIGHT_BLUE, tscon.Colour.BG);
  * ```
  */
 export enum Colour {
@@ -50,9 +50,9 @@ export type Rgb = readonly [number, number, number];
  *
  * @example
  * ```ts
- * import { Colour, DEFAULT_COLOURS } from "@micahdb/tscon";
+ * import * as tscon from "@micahdb/tscon";
  *
- * const [r, g, b] = DEFAULT_COLOURS[Colour.BLUE];
+ * const [r, g, b] = tscon.DEFAULT_COLOURS[tscon.Colour.BLUE];
  * ```
  */
 export const DEFAULT_COLOURS: readonly Rgb[] = [
@@ -86,10 +86,10 @@ export const DEFAULT_COLOURS: readonly Rgb[] = [
  *
  * @example
  * ```ts
- * import { Colour, DEFAULT_COLOURS, Palette } from "@micahdb/tscon";
+ * import * as tscon from "@micahdb/tscon";
  *
- * const palette = new Palette(DEFAULT_COLOURS);
- * palette.colours[Colour.RED] = [0xff, 0x00, 0x00];
+ * const palette = new tscon.Palette(tscon.DEFAULT_COLOURS);
+ * palette.colours[tscon.Colour.RED] = [0xff, 0x00, 0x00];
  * ```
  */
 export class Palette {

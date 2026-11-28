@@ -8,10 +8,9 @@ const DIGIT = /\d/;
  *
  * @example
  * ```ts
- * import { scanEscapeAt } from "@micahdb/tscon";
- * import type { EscapeScan } from "@micahdb/tscon";
+ * import * as tscon from "@micahdb/tscon";
  *
- * const scan: EscapeScan = scanEscapeAt("\\a0{Foo|bar}Foo", 0);
+ * const scan: tscon.EscapeScan = tscon.scanEscapeAt("\\a0{Foo|bar}Foo", 0);
  * // { kind: "anchor", chars: 12, group: 0, options: "Foo|bar" }
  * ```
  */
@@ -38,9 +37,9 @@ export type EscapeScan =
  *
  * @example
  * ```ts
- * import { scanEscapeAt } from "@micahdb/tscon";
+ * import * as tscon from "@micahdb/tscon";
  *
- * scanEscapeAt("x\\a0{Foo|bar}y", 1);
+ * tscon.scanEscapeAt("x\\a0{Foo|bar}y", 1);
  * // { kind: "anchor", chars: 12, group: 0, options: "Foo|bar" }
  * ```
  *
@@ -111,11 +110,11 @@ function scanAnchor(text: string, index: number, group: number): EscapeScan {
  *
  * @example
  * ```ts
- * import { hasEscape } from "@micahdb/tscon";
+ * import * as tscon from "@micahdb/tscon";
  *
- * hasEscape("plain text");   // false
- * hasEscape("x\\a0y");       // true
- * hasEscape("back\\slash");  // false: a lone backslash displays itself
+ * tscon.hasEscape("plain text");   // false
+ * tscon.hasEscape("x\\a0y");       // true
+ * tscon.hasEscape("back\\slash");  // false: a lone backslash displays itself
  * ```
  *
  * @param text  The text to check.

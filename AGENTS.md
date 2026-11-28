@@ -5,9 +5,9 @@ Guidance for coding agents working in this repository.
 ## What this is
 
 `@micahdb/tscon`: a TypeScript library rendering a browser canvas as a
-text-mode terminal on WebGL2. Text compiles to packed 16-bit glyph cells;
-the CPU packs bytes and the GPU rasterizes everything in one instanced
-draw. Bun builds and tests it; TypeScript checks it; oxlint lints it.
+text-mode terminal on WebGL2. Text compiles to packed 32-bit cells; the CPU
+packs glyph and colour bytes and the GPU rasterizes them in one instanced
+draw. TypeScript builds and checks it; Bun runs tests; oxlint lints it.
 Scripts live in `package.json`.
 
 ## Never publish
@@ -51,9 +51,9 @@ inline literals are fine for single-use local shapes.
 
 **Comments.** Not preferred; make code readable through naming and
 abstraction first. Add a comment only when it carries information the code
-cannot. Multi-line comments are doc comments: `/** */`, capitalized first
-word, ` * ` on continuation lines, on classes, methods, and named
-functions. Single-line notes use `//`.
+cannot. Exported classes, methods, and named functions use `/** */` doc
+comments with a capitalized first word and ` * ` continuation lines.
+Internal notes use `//`.
 
 **Formatting.** Tab indentation, semicolons, `const` by default. No line
 exceeds 100 columns; wrap arguments and hoist named locals to fit. Blank
@@ -83,8 +83,8 @@ embedding them.
 
 ## Verifying work
 
-Canvas, terminal, and renderer tests are headless. Build them with
-`new Canvas(new TestCanvasHost(...), createHeadlessGL2())` and use the real
+Canvas, terminal, and renderer tests are headless. Use
+`new Canvas(new TestCanvasHost(...), createHeadlessGL2())` with the real
 `Terminal` and `Renderer`. `TestCanvasHost` injects size, focus, pointer,
 wheel, key, and resize events; `HeadlessGL2` is a no-op WebGL2 context. Do not
 add browser DOM mocks or an alternate terminal implementation.
@@ -95,6 +95,8 @@ Run, in order, and leave each clean:
 2. `bun run typecheck` -- no errors.
 3. `bun run lint` -- no warnings.
 4. `bun run build` -- completes.
+
+Run `bun run shaders` after changing files in `shaders/`.
 
 The line-length and blank-line conventions are not fully lint-enforced;
 check them by eye on every file touched.

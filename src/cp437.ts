@@ -92,10 +92,10 @@ function fitsCell(box: GlyphBox, width: number, above: number, below: number): b
  *
  * @example
  * ```ts
- * import { renderCp437 } from "@micahdb/tscon";
+ * import * as tscon from "@micahdb/tscon";
  *
  * const canvas = document.getElementById("2d") as HTMLCanvasElement;
- * await renderCp437(canvas, "160px 'JetBrains Mono'");
+ * await tscon.renderCp437(canvas, "160px 'JetBrains Mono'");
  * ```
  *
  * @param canvas  The 2D canvas to render onto. Its `width`/`height` are set.

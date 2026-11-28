@@ -10,10 +10,10 @@
  *
  * @example
  * ```ts
- * import { TexGlyphMode, textureGlyphs } from "@micahdb/tscon";
+ * import * as tscon from "@micahdb/tscon";
  *
  * // a 24x48 region drawn as bright coloured characters
- * const tg = textureGlyphs(24, 48, TexGlyphMode.BG_GLYPHS);
+ * const tg = tscon.textureGlyphs(24, 48, tscon.TexGlyphMode.BG_GLYPHS);
  * ```
  */
 export enum TexGlyphMode {
@@ -30,10 +30,9 @@ export enum TexGlyphMode {
  *
  * @example
  * ```ts
- * import { TexGlyphMode, textureGlyphs } from "@micahdb/tscon";
- * import type { TexGlyphs } from "@micahdb/tscon";
+ * import * as tscon from "@micahdb/tscon";
  *
- * const tg: TexGlyphs = textureGlyphs(24, 48, TexGlyphMode.SAMPLE);
+ * const tg: tscon.TexGlyphs = tscon.textureGlyphs(24, 48, tscon.TexGlyphMode.SAMPLE);
  *
  * tg.rows;   // 24
  * tg.cols;   // 48
@@ -70,13 +69,13 @@ function cellMode(mode: TexGlyphMode, row: number, col: number): TexGlyphMode {
  *
  * @example
  * ```ts
- * import { TexGlyphMode, textureGlyphs } from "@micahdb/tscon";
+ * import * as tscon from "@micahdb/tscon";
  *
  * // the whole canvas, texture shown as coloured characters
- * const full = textureGlyphs(canvas.rows, canvas.cols, TexGlyphMode.GLYPHS);
+ * const full = tscon.textureGlyphs(canvas.rows, canvas.cols, tscon.TexGlyphMode.GLYPHS);
  *
  * // a 24x48 inset, texture shown as it is
- * const inset = textureGlyphs(24, 48, TexGlyphMode.SAMPLE);
+ * const inset = tscon.textureGlyphs(24, 48, tscon.TexGlyphMode.SAMPLE);
  * ```
  *
  * @param rows  Height in cells. The packed row index supports up to 256 rows.

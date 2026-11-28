@@ -10,7 +10,7 @@ import type { Rect } from "../rect.ts";
 import { terminal_frag, terminal_vert } from "./shaders.ts";
 
 /**
- * Renders a character grid from glyphs onto a {@link Canvas}.
+ * Render a character grid from glyphs onto a {@link Canvas}.
  *
  * For each frame, call {@link clear}, copy {@link Glyphs} with {@link blit},
  * then call {@link draw}.

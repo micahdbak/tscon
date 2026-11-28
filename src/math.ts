@@ -303,12 +303,12 @@ export class Mat4 {
 	 *
 	 * @example
 	 * ```ts
-	 * import { Mat4 } from "@micahdb/tscon";
+	 * import * as tscon from "@micahdb/tscon";
 	 *
-	 * const mv = Mat4.create();
-	 * Mat4.multiply(mv, view, model);
+	 * const mv = tscon.Mat4.create();
+	 * tscon.Mat4.multiply(mv, view, model);
 	 * const normals = new Float32Array(9);
-	 * Mat4.inverseTranspose3x3(normals, mv);
+	 * tscon.Mat4.inverseTranspose3x3(normals, mv);
 	 * gl.uniformMatrix3fv(loc, false, normals);
 	 * ```
 	 *

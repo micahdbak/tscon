@@ -3,9 +3,9 @@
  *
  * @example
  * ```ts
- * import { compileProgram } from "@micahdb/tscon";
+ * import * as tscon from "@micahdb/tscon";
  *
- * const program = compileProgram(gl, vertSrc, fragSrc);
+ * const program = tscon.compileProgram(gl, vertSrc, fragSrc);
  * gl.useProgram(program);
  * ```
  *
@@ -72,9 +72,9 @@ export function compileProgram(
  *
  * @example
  * ```ts
- * import { getAttribLocations } from "@micahdb/tscon";
+ * import * as tscon from "@micahdb/tscon";
  *
- * const attributes = getAttribLocations(gl, program, {
+ * const attributes = tscon.getAttribLocations(gl, program, {
  *   position: "a_position",
  *   normal:   "a_normal",
  *   uv:       "a_uv_coord",
@@ -115,9 +115,9 @@ export function getAttribLocations(
  *
  * @example
  * ```ts
- * import { getUniformLocations } from "@micahdb/tscon";
+ * import * as tscon from "@micahdb/tscon";
  *
- * const uniforms = getUniformLocations(gl, program, {
+ * const uniforms = tscon.getUniformLocations(gl, program, {
  *   projection: "u_projection_matrix",
  *   view:       "u_view_matrix",
  *   model:      "u_model_matrix",

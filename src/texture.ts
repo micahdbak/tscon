@@ -7,16 +7,16 @@
  * `LINEAR_MIPMAP_LINEAR` minification and `LINEAR` magnification filtering so
  * it can be sampled at arbitrary sizes by a shader.
  *
- * The returned texture is suitable for use as the `texture` argument of
- * {@link Renderer.draw} (e.g. a photograph, portrait or rendered scene) or
- * as the `canvas.user_font` application-provided font texture.
+ * The returned texture is suitable for the `texture` argument of
+ * {@link Renderer.draw}. Use {@link renderCp437} to build a font atlas for
+ * {@link Canvas.user_font}.
  *
  * @example
  * ```ts
- * import { Canvas, loadTexture } from "@micahdb/tscon";
+ * import * as tscon from "@micahdb/tscon";
  *
- * const canvas = Canvas.from(element);
- * const texture = await loadTexture(canvas.gl, "/images/portrait.jpeg");
+ * const canvas = tscon.Canvas.from(element);
+ * const texture = await tscon.loadTexture(canvas.gl, "/images/portrait.jpeg");
  * ```
  *
  * @param gl    The WebGL2 context to create the texture on.
@@ -89,10 +89,10 @@ export function loadTexture(
  *
  * @example
  * ```ts
- * import { Canvas, loadCubeMap } from "@micahdb/tscon";
+ * import * as tscon from "@micahdb/tscon";
  *
- * const canvas = Canvas.from(element);
- * const skybox = await loadCubeMap(canvas.gl, [
+ * const canvas = tscon.Canvas.from(element);
+ * const skybox = await tscon.loadCubeMap(canvas.gl, [
  *   "/images/skybox/right.png",
  *   "/images/skybox/left.png",
  *   "/images/skybox/top.png",

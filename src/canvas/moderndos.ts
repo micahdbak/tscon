@@ -257,7 +257,7 @@ const PC_FACE_MODERNDOS_8X16_FONT_MAP: number[][] = [
   [0x00, 0x00, 0x00, 0x00, 0x7c, 0x7c, 0x7c, 0x7c, 0x7c, 0x7c, 0x7c, 0x00, 0x00, 0x00, 0x00, 0x00],
 ];
 
-/** Upload the 32x8 glyph grid as four RGBA texels per glyph, one byte per bitmap row. */
+// Upload the 32x8 glyph grid as four RGBA texels per glyph, one byte per bitmap row.
 export function loadModernDosTexture(gl: WebGL2RenderingContext): WebGLTexture {
 	const cols = 32;
 	const width = cols;

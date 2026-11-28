@@ -1,16 +1,14 @@
 /**
- * A position in a cell grid: a row and a column.
+ * A row and column in a cell grid.
  *
- * Rows are counted from the top and columns from the left, in whole cells.
- * This is the coordinate system everything in tscon is expressed in: the
- * top-left cell of a {@link Rect} is a `Cell`, and the positions
- * {@link Glyphs} reports are `Cell`s.
+ * Rows count down from the top and columns count right from the left.
+ * Rects and {@link Glyphs} positions use the same shape.
  *
  * @example
  * ```ts
- * import type { Cell } from "@micahdb/tscon";
+ * import * as tscon from "@micahdb/tscon";
  *
- * const at: Cell = { row: 3, col: 7 };   // row 3, column 7
+ * const at: tscon.Cell = { row: 3, col: 7 };   // row 3, column 7
  * ```
  */
 export type Cell = {
@@ -25,17 +23,20 @@ export type Cell = {
  *
  * @example
  * ```ts
- * import { unpackCell } from "@micahdb/tscon";
+ * import * as tscon from "@micahdb/tscon";
  *
- * const glyph = unpackCell(0x101141);
+ * const glyph = tscon.unpackCell(0x101141);
  * // { char_code: 65, foreground: 16, background: 17 }
  * ```
  *
  * See {@link packCell} and {@link unpackCell}.
  */
 export type CellAttributes = {
+	/** CP437 character code. */
 	char_code: number;
+	/** Foreground palette index. */
 	foreground: number;
+	/** Background palette index. */
 	background: number;
 };
 
@@ -49,9 +50,9 @@ export type CellAttributes = {
  *
  * @example
  * ```ts
- * import { Colour, packCell } from "@micahdb/tscon";
+ * import * as tscon from "@micahdb/tscon";
  *
- * const cell = packCell(65, Colour.FG, Colour.BG);
+ * const cell = tscon.packCell(65, tscon.Colour.FG, tscon.Colour.BG);
  * ```
  *
  * @param char_code   CP437 character code (low eight bits).
@@ -68,9 +69,9 @@ export function packCell(char_code: number, foreground: number, background: numb
  *
  * @example
  * ```ts
- * import { unpackCell } from "@micahdb/tscon";
+ * import * as tscon from "@micahdb/tscon";
  *
- * const { foreground } = unpackCell(0x101141); // 16
+ * const { foreground } = tscon.unpackCell(0x101141); // 16
  * ```
  *
  * @param cell   A word from {@link packCell} or the glyph grid.

@@ -7,23 +7,21 @@ import { type Cell, packCell } from "./cell.ts";
 import { type Span, Spans } from "./span.ts";
 
 /**
- * A position that tscon text marks for the application, produced by an
- * `\aX` anchor escape sequence.
+ * A position marked by an `\aX` anchor escape.
  *
- * An anchor takes no columns of its own: it marks the cell of the character
- * that follows it, which may be on a later wrapped row, past a tab, or at
- * the end of the last row when nothing follows. `options` is the escape's
- * `{...}` payload, or `null` when the braces are absent or empty.
+ * An anchor takes no columns. It marks the next visible cell, which may be
+ * on a later wrapped row, past a tab, or at the end of the last row when
+ * nothing follows. `options` is the escape's `{...}` payload, or `null` when
+ * the braces are absent or empty.
  *
- * `start` and `end` delimit the escape itself in the source text, while
- * `row`, `col`, and `index` describe the visible cell it captures. Group
- * numbers and payloads are application data. See {@link Glyphs.anchors}.
+ * `start` and `end` delimit the escape in the source text. `row`, `col`, and
+ * `index` describe the cell it captures. See {@link Glyphs.anchors}.
  *
  * @example
  * ```ts
- * import { Glyphs } from "@micahdb/tscon";
+ * import * as tscon from "@micahdb/tscon";
  *
- * const g = new Glyphs("\\a0{Foo|bar}Foo", 10);
+ * const g = new tscon.Glyphs("\\a0{Foo|bar}Foo", 10);
  *
  * g.anchors[0]![0]!.options; // "Foo|bar"
  * g.anchors[0]![0]!.row;     // 0
@@ -57,9 +55,9 @@ export type Anchor = {
  *
  * @example
  * ```ts
- * import { Glyphs } from "@micahdb/tscon";
+ * import * as tscon from "@micahdb/tscon";
  *
- * const g = new Glyphs("hello \\f1world", 80);
+ * const g = new tscon.Glyphs("hello \\f1world", 80);
  *
  * g.rows;                // 1
  * g.renderedCell(9);     // { row: 0, col: 6 }: where "w" draws
@@ -76,7 +74,8 @@ export class Glyphs {
 	/**
 	 * The cells to draw, row-major with `rows * cols` entries, one 32-bit
 	 * value per cell. A cell of `0` is blank and paints nothing when
-	 * blitted. Use {@link packCell} and {@link unpackCell} to work with the fields.
+	 * blitted. Use {@link packCell} and {@link unpackCell} to read or write
+	 * its fields.
 	 */
 	readonly data: Uint32Array;
 
@@ -112,9 +111,9 @@ export class Glyphs {
 	 *
 	 * @example
 	 * ```ts
-	 * import { Glyphs, Wrap } from "@micahdb/tscon";
+	 * import * as tscon from "@micahdb/tscon";
 	 *
-	 * const g = new Glyphs("long text", 4, { wrap: Wrap.HARD });
+	 * const g = new tscon.Glyphs("long text", 4, { wrap: tscon.Wrap.HARD });
 	 *
 	 * g.rows;          // 3: "long", " tex", "t"
 	 * g.wrappedText;   // ["long", " tex", "t"]
@@ -299,9 +298,9 @@ export class Glyphs {
 	 *
 	 * @example
 	 * ```ts
-	 * import { Glyphs } from "@micahdb/tscon";
+	 * import * as tscon from "@micahdb/tscon";
 	 *
-	 * const g = new Glyphs("ab", 10);
+	 * const g = new tscon.Glyphs("ab", 10);
 	 *
 	 * g.renderedCell(1);   // { row: 0, col: 1 }: the "b"
 	 * g.renderedCell(2);   // null: past the end of the text
@@ -332,9 +331,9 @@ export class Glyphs {
 	 *
 	 * @example
 	 * ```ts
-	 * import { Glyphs } from "@micahdb/tscon";
+	 * import * as tscon from "@micahdb/tscon";
 	 *
-	 * const g = new Glyphs("ab\\f1c", 10);
+	 * const g = new tscon.Glyphs("ab\\f1c", 10);
 	 *
 	 * g.cursorCell(2);   // { row: 0, col: 2 }: the escape shows on the "c"
 	 * g.cursorCell(9);   // { row: 0, col: 3 }: past the end clamps
@@ -342,9 +341,9 @@ export class Glyphs {
 	 *
 	 * @example
 	 * ```ts
-	 * import { Glyphs } from "@micahdb/tscon";
+	 * import * as tscon from "@micahdb/tscon";
 	 *
-	 * const g = new Glyphs("a\tb", 20);
+	 * const g = new tscon.Glyphs("a\tb", 20);
 	 *
 	 * g.cursorCell(1);   // { row: 0, col: 1 }: the tab's blank run starts here
 	 * g.cursorCell(2);   // { row: 0, col: 8 }: the "b" after the tab stop
@@ -391,9 +390,9 @@ export class Glyphs {
 	 *
 	 * @example
 	 * ```ts
-	 * import { Glyphs } from "@micahdb/tscon";
+	 * import * as tscon from "@micahdb/tscon";
 	 *
-	 * const g = new Glyphs("ab", 10);
+	 * const g = new tscon.Glyphs("ab", 10);
 	 *
 	 * g.cursorIndex(0, 0);   // 0: the "a"
 	 * g.cursorIndex(0, 9);   // 1: past the end clamps to the last character
@@ -401,10 +400,10 @@ export class Glyphs {
 	 *
 	 * @example
 	 * ```ts
-	 * import { Glyphs } from "@micahdb/tscon";
+	 * import * as tscon from "@micahdb/tscon";
 	 *
 	 * // a click anywhere in a tab's blank run lands on that tab
-	 * const g = new Glyphs("a\tb", 20);
+	 * const g = new tscon.Glyphs("a\tb", 20);
 	 *
 	 * g.cursorIndex(0, 4);   // 1: inside the tab's run
 	 * g.cursorIndex(0, 8);   // 2: the "b" after the tab stop
@@ -442,9 +441,9 @@ export class Glyphs {
 	 *
 	 * @example
 	 * ```ts
-	 * import { Glyphs } from "@micahdb/tscon";
+	 * import * as tscon from "@micahdb/tscon";
 	 *
-	 * const g = new Glyphs("ab\tc", 20);
+	 * const g = new tscon.Glyphs("ab\tc", 20);
 	 *
 	 * g.rowCols(0);   // 9: "ab", a tab to column 8, then "c"
 	 * g.rowCols(1);   // 0: outside the grid
@@ -465,9 +464,9 @@ export class Glyphs {
 	 *
 	 * @example
 	 * ```ts
-	 * import { Glyphs } from "@micahdb/tscon";
+	 * import * as tscon from "@micahdb/tscon";
 	 *
-	 * const g = new Glyphs("aaaa bbbb", 5);
+	 * const g = new tscon.Glyphs("aaaa bbbb", 5);
 	 *
 	 * [...g.spansFor(2, 6)];
 	 * // [{ row: 0, from: 2, to: 4 }, { row: 1, from: 0, to: 1 }]
@@ -475,10 +474,10 @@ export class Glyphs {
 	 *
 	 * @example
 	 * ```ts
-	 * import { Glyphs } from "@micahdb/tscon";
+	 * import * as tscon from "@micahdb/tscon";
 	 *
 	 * // escapes inside the range do not split the run
-	 * const g = new Glyphs("aa\\f1bb", 20);
+	 * const g = new tscon.Glyphs("aa\\f1bb", 20);
 	 *
 	 * [...g.spansFor(0, 7)];   // [{ row: 0, from: 0, to: 4 }]
 	 * ```
@@ -524,9 +523,9 @@ export class Glyphs {
 	 *
 	 * @example
 	 * ```ts
-	 * import { Glyphs } from "@micahdb/tscon";
+	 * import * as tscon from "@micahdb/tscon";
 	 *
-	 * const g = new Glyphs("hello world", 11);
+	 * const g = new tscon.Glyphs("hello world", 11);
 	 *
 	 * // blank the first three cells, so whatever is beneath shows through
 	 * const cleared = g.mapCells(
@@ -540,11 +539,11 @@ export class Glyphs {
 	 *
 	 * @example
 	 * ```ts
-	 * import { Glyphs } from "@micahdb/tscon";
+	 * import * as tscon from "@micahdb/tscon";
 	 *
 	 * // draw one grid's cells over another's where they are not blank
-	 * const base = new Glyphs("base text", 9);
-	 * const over = new Glyphs("XXXXX", 9);
+	 * const base = new tscon.Glyphs("base text", 9);
+	 * const over = new tscon.Glyphs("XXXXX", 9);
 	 *
 	 * const merged = base.mapCells((cell, row, col) => {
 	 *     const overlay = over.data[row * over.cols + col];

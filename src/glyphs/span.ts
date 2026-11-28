@@ -12,10 +12,10 @@ import type { Glyphs } from "./glyphs.ts";
  *
  * @example
  * ```ts
- * import type { Span } from "@micahdb/tscon";
+ * import * as tscon from "@micahdb/tscon";
  *
  * // columns 4, 5, and 6 of row 2
- * const span: Span = { row: 2, from: 4, to: 7 };
+ * const span: tscon.Span = { row: 2, from: 4, to: 7 };
  * ```
  */
 export type Span = {
@@ -38,9 +38,9 @@ export type Span = {
  *
  * @example
  * ```ts
- * import { Glyphs } from "@micahdb/tscon";
+ * import * as tscon from "@micahdb/tscon";
  *
- * const glyphs = new Glyphs("aaaa bbbb", 5);
+ * const glyphs = new tscon.Glyphs("aaaa bbbb", 5);
  * const spans = glyphs.spansFor(2, 6);
  *
  * spans.contains(1, 0);   // true: the run on the second row
@@ -62,10 +62,10 @@ export class Spans implements Iterable<Span> {
 	 *
 	 * @example
 	 * ```ts
-	 * import { Glyphs, Spans } from "@micahdb/tscon";
+	 * import * as tscon from "@micahdb/tscon";
 	 *
-	 * const glyphs = new Glyphs("hello", 5);
-	 * const spans = new Spans(glyphs, [{ row: 0, from: 1, to: 4 }]);
+	 * const glyphs = new tscon.Glyphs("hello", 5);
+	 * const spans = new tscon.Spans(glyphs, [{ row: 0, from: 1, to: 4 }]);
 	 * ```
 	 *
 	 * @param glyphs  The grid the spans select cells in.
@@ -86,9 +86,9 @@ export class Spans implements Iterable<Span> {
 	 *
 	 * @example
 	 * ```ts
-	 * import { Glyphs } from "@micahdb/tscon";
+	 * import * as tscon from "@micahdb/tscon";
 	 *
-	 * const spans = new Glyphs("abcd", 4).spansFor(1, 3);
+	 * const spans = new tscon.Glyphs("abcd", 4).spansFor(1, 3);
 	 *
 	 * spans.contains(0, 0);   // false
 	 * spans.contains(0, 1);   // true
@@ -116,10 +116,10 @@ export class Spans implements Iterable<Span> {
 	 *
 	 * @example
 	 * ```ts
-	 * import { Glyphs } from "@micahdb/tscon";
+	 * import * as tscon from "@micahdb/tscon";
 	 *
-	 * const first = new Glyphs("abcd", 4).spansFor(1, 3);
-	 * const second = new Glyphs("wxyz", 4).spansFor(1, 3);
+	 * const first = new tscon.Glyphs("abcd", 4).spansFor(1, 3);
+	 * const second = new tscon.Glyphs("wxyz", 4).spansFor(1, 3);
 	 *
 	 * first.equals(second);   // true
 	 * ```
@@ -152,12 +152,12 @@ export class Spans implements Iterable<Span> {
 	 *
 	 * @example
 	 * ```ts
-	 * import { Glyphs, packCell, unpackCell } from "@micahdb/tscon";
+	 * import * as tscon from "@micahdb/tscon";
 	 *
-	 * const spans = new Glyphs("abcd", 4).spansFor(1, 3);
+	 * const spans = new tscon.Glyphs("abcd", 4).spansFor(1, 3);
 	 * const inverted = spans.mapCells((cell) => {
-	 *     const glyph = unpackCell(cell);
-	 *     return packCell(glyph.char_code, glyph.background, glyph.foreground);
+	 *     const glyph = tscon.unpackCell(cell);
+	 *     return tscon.packCell(glyph.char_code, glyph.background, glyph.foreground);
 	 * });
 	 * ```
 	 *
