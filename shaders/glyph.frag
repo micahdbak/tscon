@@ -31,6 +31,7 @@ float atlas_glyph_value(
 	ivec2 origin = glyph_coord * size;
 	vec2 center = cell_coord * vec2(size);
 	vec2 footprint = cell_footprint * vec2(size);
+
 	// Bound the sampling cost for large atlases while spreading taps over the pixel.
 	ivec2 taps = ivec2(clamp(ceil(footprint), vec2(1.0), vec2(4.0)));
 	vec2 step_size = footprint / vec2(taps);

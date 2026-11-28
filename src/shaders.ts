@@ -34,6 +34,7 @@ float atlas_glyph_value(
 	ivec2 origin = glyph_coord * size;
 	vec2 center = cell_coord * vec2(size);
 	vec2 footprint = cell_footprint * vec2(size);
+
 	// Bound the sampling cost for large atlases while spreading taps over the pixel.
 	ivec2 taps = ivec2(clamp(ceil(footprint), vec2(1.0), vec2(4.0)));
 	vec2 step_size = footprint / vec2(taps);
@@ -265,7 +266,7 @@ Glyph getGlyph(int dim, float lum) {
 	int fgs[2] = int[](dim, dim + 8);
 
 	if (dim == 7) {
-		fgs = int[](8, 15);
+		fgs = int[](7, 15);
 	}
 
 	int layer = clamp(int(lum * 2.0), 0, 2);
@@ -296,7 +297,7 @@ Glyph getBgGlyph(int dim, float lum) {
 				       46, 0);
 		}
 
-		fgs = int[](7, 0, 8);
+		fgs = int[](7, 17, 17);
 		bgs = int[](17, 7, 15);
 	}
 
@@ -345,7 +346,6 @@ void main() {
 	if (f_mode == SAMPLE_MODE) {
 		return;
 	}
-
 
 	vec2 origin_uv_coord = vec2(float(origin_col) / float(u_cols),
 				    float(origin_row) / float(u_rows));

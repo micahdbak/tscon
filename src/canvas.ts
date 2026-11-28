@@ -33,9 +33,11 @@ export type CanvasOptions = {
  * `"resize"` fires when the row or column count changes. `"wheel"` carries
  * a signed whole-row delta in `detail.rows`. `"keydown"` and `"keyup"`
  * carry a {@link Key} in `detail`; they only fire while the host is
- * focused, so keys aimed at other elements are never delivered here.
- * While attached, the canvas consumes Ctrl/Cmd+A and Ctrl/Cmd+C so the
- * page DOM beneath cannot be selected or copied.
+ * focused, so keys aimed at other elements are never delivered here. The
+ * pointer focuses the canvas when it is pressed; call {@link focus} to
+ * hand it the keyboard on boot. While attached, the canvas consumes
+ * Ctrl/Cmd+A and Ctrl/Cmd+C so the page DOM beneath cannot be selected or
+ * copied.
  *
  * Use {@link Canvas.from} in a browser or supply a {@link CanvasHost}
  * and a WebGL2 context.
@@ -44,6 +46,8 @@ export type CanvasOptions = {
  * ```ts
  * const canvas = Canvas.from(document.querySelector("canvas")!);
  * const terminal = new Terminal(canvas);
+ *
+ * canvas.focus(); // key events now reach the canvas
  * ```
  */
 export class Canvas extends EventTarget {
@@ -309,6 +313,20 @@ export class Canvas extends EventTarget {
 
 		this.unsubscribers.length = 0;
 		this.host.dispose();
+	}
+
+	/**
+	 * Focus the input element so this canvas receives key events. Pages that
+	 * want the keyboard immediately can call this once on boot; the pointer
+	 * focuses the element on its own.
+	 */
+	focus(): void {
+		this.host.focus();
+	}
+
+	/** Blur the input element, stopping key events. */
+	blur(): void {
+		this.host.blur();
 	}
 
 	private resize(): void {

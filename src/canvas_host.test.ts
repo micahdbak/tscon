@@ -4,6 +4,7 @@ import { Canvas } from "./canvas.ts";
 import { TestCanvasHost, WebCanvasHost, type CanvasHostEventMap } from "./canvas_host.ts";
 import { Palette } from "./colour.ts";
 import { createHeadlessGL2 } from "./headless_gl.ts";
+import type { Key } from "./input.ts";
 
 type FakeWindow = EventTarget & { devicePixelRatio: number };
 
@@ -26,6 +27,8 @@ function fakeElement() {
 		setPointerCapture: () => {
 			captures++;
 		},
+		focus: () => element.dispatchEvent(new Event("focus")),
+		blur: () => element.dispatchEvent(new Event("blur")),
 		getBoundingClientRect: () => ({
 			left: 0,
 			top: 0,
@@ -54,6 +57,17 @@ function pointerEvent(type: string, x: number, y: number): Event {
 		clientX: x,
 		clientY: y,
 		pointerId: 1,
+	});
+}
+
+function keyEvent(key: string): Event {
+	return Object.assign(new Event("keydown", { cancelable: true }), {
+		key,
+		ctrlKey: false,
+		altKey: false,
+		metaKey: false,
+		shiftKey: false,
+		repeat: false,
 	});
 }
 
@@ -131,6 +145,7 @@ describe("WebCanvasHost", () => {
 
 		expect(moves).toEqual([{ x: 40, y: 80, inside: true }]);
 		expect(element.captures()).toBe(1);
+		expect(host.focused).toBe(true);
 
 		const wheel = Object.assign(new Event("wheel", { cancelable: true }), {
 			deltaMode: 0,
@@ -140,27 +155,18 @@ describe("WebCanvasHost", () => {
 
 		expect(wheel.defaultPrevented).toBe(true);
 
-		window.dispatchEvent(
-			Object.assign(new Event("keydown", { cancelable: true }), {
-				key: "j",
-				ctrlKey: false,
-				altKey: false,
-				metaKey: false,
-				shiftKey: false,
-				repeat: false,
-			}),
-		);
+		window.dispatchEvent(keyEvent("j"));
 
 		expect(keys).toHaveLength(1);
 		expect(keys[0]!.key).toBe("j");
 
 		keys[0]!.prevent_default();
+
+		element.dispatchEvent(new Event("blur"));
 		expect(host.focused).toBe(false);
 
 		element.dispatchEvent(new Event("focus"));
 		expect(host.focused).toBe(true);
-		element.dispatchEvent(new Event("blur"));
-		expect(host.focused).toBe(false);
 
 		element.setClientSize(400, 240);
 		window.dispatchEvent(new Event("resize"));
@@ -169,6 +175,57 @@ describe("WebCanvasHost", () => {
 		expect(host.css_height).toBe(240);
 
 		host.dispose();
+	});
+
+	test("focus and blur move DOM focus, and a press focuses too", () => {
+		const window = fakeWindow();
+		(globalThis as Record<string, unknown>).window = window;
+
+		const element = fakeElement();
+		const host = new WebCanvasHost(element as unknown as HTMLCanvasElement);
+		const events: string[] = [];
+
+		host.on("focus", () => events.push("focus"));
+		host.on("blur", () => events.push("blur"));
+
+		host.focus();
+		expect(host.focused).toBe(true);
+
+		host.blur();
+		expect(host.focused).toBe(false);
+
+		element.dispatchEvent(pointerEvent("pointerdown", 0, 0));
+		expect(host.focused).toBe(true);
+
+		expect(events).toEqual(["focus", "blur", "focus"]);
+
+		host.dispose();
+	});
+
+	test("Canvas.focus hands the canvas the keyboard", () => {
+		const window = fakeWindow();
+		(globalThis as Record<string, unknown>).window = window;
+
+		const element = fakeElement();
+		const canvas = Canvas.from(element as unknown as HTMLCanvasElement);
+		const keys: string[] = [];
+
+		canvas.addEventListener("keydown", (event) => {
+			keys.push((event as CustomEvent<Key>).detail.key);
+		});
+
+		window.dispatchEvent(keyEvent("j"));
+		expect(keys).toEqual([]);
+
+		canvas.focus();
+		window.dispatchEvent(keyEvent("j"));
+		expect(keys).toEqual(["j"]);
+
+		canvas.blur();
+		window.dispatchEvent(keyEvent("j"));
+		expect(keys).toEqual(["j"]);
+
+		canvas.dispose();
 	});
 
 	test("follows the element's own resize, not just the window's", () => {

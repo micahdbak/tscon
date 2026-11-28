@@ -72,6 +72,20 @@ export interface CanvasHost {
 	readonly focused: boolean;
 
 	/**
+	 * Focus the input element, so key events reach the canvas.
+	 *
+	 * @example
+	 * ```ts
+	 * const canvas = Canvas.from(document.querySelector("canvas")!);
+	 * canvas.focus();
+	 * ```
+	 */
+	focus(): void;
+
+	/** Blur the input element, stopping key events. */
+	blur(): void;
+
+	/**
 	 * Subscribe to one host event.
 	 *
 	 * @param type      Event name.
@@ -94,6 +108,10 @@ abstract class CanvasHostBase implements CanvasHost {
 	pixel_height = 0;
 	dpr = 1;
 	focused = false;
+
+	abstract focus(): void;
+
+	abstract blur(): void;
 
 	private readonly listeners = new Map<
 		string,
@@ -169,6 +187,9 @@ export class WebCanvasHost extends CanvasHostBase {
 
 	private readonly on_pointer_down = (event: PointerEvent): void => {
 		event.preventDefault();
+
+		// preventDefault suppresses the browser's implicit focus, so ask for it
+		this.element.focus();
 
 		const point = this.point(event.clientX, event.clientY);
 
@@ -292,6 +313,19 @@ export class WebCanvasHost extends CanvasHostBase {
 		this.element.removeEventListener("blur", this.on_blur);
 
 		super.dispose();
+	}
+
+	/**
+	 * Move DOM focus to the element; `"focus"` follows from the element's own
+	 * event, so calling this on an already focused element does nothing.
+	 */
+	focus(): void {
+		this.element.focus();
+	}
+
+	/** Move DOM focus off the element; `"blur"` follows from the element's own event. */
+	blur(): void {
+		this.element.blur();
 	}
 
 	private resize(): void {
