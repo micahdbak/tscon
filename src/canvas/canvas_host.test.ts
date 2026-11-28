@@ -1,9 +1,8 @@
 import { afterAll, describe, expect, test } from "bun:test";
-
+import { Palette } from "../colour.ts";
+import { createHeadlessGL2 } from "../headless_gl.ts";
 import { Canvas } from "./canvas.ts";
-import { TestCanvasHost, WebCanvasHost, type CanvasHostEventMap } from "./canvas_host.ts";
-import { Palette } from "./colour.ts";
-import { createHeadlessGL2 } from "./headless_gl.ts";
+import { type CanvasHostEventMap, TestCanvasHost, WebCanvasHost } from "./canvas_host.ts";
 import type { Key } from "./input.ts";
 
 type FakeWindow = EventTarget & { devicePixelRatio: number };

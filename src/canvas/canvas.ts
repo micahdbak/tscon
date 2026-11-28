@@ -1,6 +1,6 @@
-import { WebCanvasHost, type CanvasHost } from "./canvas_host.ts";
-import { Colour, DEFAULT_COLOURS, Palette } from "./colour.ts";
-import { pointerCell, scrollRowsForKey, wheelRows, type Key, type WheelMode } from "./input.ts";
+import { Colour, DEFAULT_COLOURS, Palette } from "../colour.ts";
+import { type CanvasHost, WebCanvasHost } from "./canvas_host.ts";
+import { type Key, pointerCell, scrollRowsForKey, type WheelMode, wheelRows } from "./input.ts";
 import { loadModernDosTexture } from "./moderndos.ts";
 
 const PAGE_SHORTCUT_KEYS = new Set(["a", "c", "f", "g"]);

@@ -1,5 +1,4 @@
 import { afterAll, describe, expect, test } from "bun:test";
-
 import { HeadlessGL2 } from "./headless_gl.ts";
 import { loadCubeMap, loadTexture } from "./texture.ts";
 

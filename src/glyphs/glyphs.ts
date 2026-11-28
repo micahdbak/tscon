@@ -1,12 +1,10 @@
-import { scanEscapeAt } from "./escape.ts";
-import { TAB_WIDTH, layoutText } from "./wrap.ts";
-import type { TextLayout, TextOptions } from "./wrap.ts";
-import { Colour } from "./colour.ts";
-import { charCodeInCp437 } from "./cp437.ts";
-import { packCell, type Cell } from "./cell.ts";
-import { Spans } from "./span.ts";
-import type { Span } from "./span.ts";
-import type { Rect } from "./rect.ts";
+import { Colour } from "../colour.ts";
+import { charCodeInCp437 } from "../cp437.ts";
+import { scanEscapeAt } from "../layout/escape.ts";
+import { layoutText, TAB_WIDTH, type TextLayout, type TextOptions } from "../layout/wrap.ts";
+import type { Rect } from "../rect.ts";
+import { type Cell, packCell } from "./cell.ts";
+import { type Span, Spans } from "./span.ts";
 
 /**
  * A position that tscon text marks for the application, produced by an

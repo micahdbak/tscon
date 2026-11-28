@@ -144,7 +144,8 @@ bun run lint
 bun run build
 ```
 
-Run `bun run shaders` after changing `shaders/` to regenerate `src/shaders.ts`.
+Run `bun run shaders` after changing `shaders/` to regenerate
+`src/renderer/shaders.ts` and `src/terminal/shaders.ts`.
 The build emits JavaScript and declarations in `dist/`.
 
 ## License

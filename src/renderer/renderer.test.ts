@@ -1,10 +1,9 @@
 import { describe, expect, test } from "bun:test";
-
-import { Canvas } from "./canvas.ts";
-import { TestCanvasHost } from "./canvas_host.ts";
-import { createHeadlessGL2, HeadlessGL2 } from "./headless_gl.ts";
+import { Canvas } from "../canvas/canvas.ts";
+import { TestCanvasHost } from "../canvas/canvas_host.ts";
+import { createHeadlessGL2, HeadlessGL2 } from "../headless_gl.ts";
+import { Terminal } from "../terminal/terminal.ts";
 import { Renderer } from "./renderer.ts";
-import { Terminal } from "./terminal.ts";
 import { TexGlyphMode, textureGlyphs } from "./tex_glyphs.ts";
 
 class DrawGL extends HeadlessGL2 {

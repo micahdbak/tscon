@@ -1,8 +1,7 @@
 import { describe, expect, test } from "bun:test";
-
+import { Wrap } from "../layout/wrap.ts";
 import { packCell, unpackCell } from "./cell.ts";
 import { Glyphs } from "./glyphs.ts";
-import { Wrap } from "./wrap.ts";
 
 const B = "\\";
 

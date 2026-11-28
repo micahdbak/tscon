@@ -1,7 +1,7 @@
+import type { Rect } from "../rect.ts";
+import type { Terminal } from "../terminal/terminal.ts";
 import type { Cell } from "./cell.ts";
 import type { Glyphs } from "./glyphs.ts";
-import type { Rect } from "./rect.ts";
-import type { Terminal } from "./terminal.ts";
 
 /**
  * A horizontal run of cells on one row, from column `from` (inclusive) to

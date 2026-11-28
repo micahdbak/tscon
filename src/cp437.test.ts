@@ -1,6 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
-
-import { CP437_CHARS, charCodeInCp437, renderCp437 } from "./cp437.ts";
+import { charCodeInCp437, CP437_CHARS, renderCp437 } from "./cp437.ts";
 
 const previous_document = (globalThis as Record<string, unknown>).document;
 

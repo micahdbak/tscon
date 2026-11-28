@@ -1,4 +1,4 @@
-import type { Cell } from "./cell.ts";
+import type { Cell } from "../glyphs/cell.ts";
 
 /**
  * A wheel delta mode, matching the DOM `WheelEvent.deltaMode` values.

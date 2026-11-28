@@ -1,9 +1,8 @@
 import { describe, expect, test } from "bun:test";
-
-import { Canvas } from "./canvas.ts";
-import { TestCanvasHost } from "./canvas_host.ts";
-import { Glyphs } from "./glyphs.ts";
-import { HeadlessGL2 } from "./headless_gl.ts";
+import { Canvas } from "../canvas/canvas.ts";
+import { TestCanvasHost } from "../canvas/canvas_host.ts";
+import { Glyphs } from "../glyphs/glyphs.ts";
+import { HeadlessGL2 } from "../headless_gl.ts";
 import { Terminal } from "./terminal.ts";
 
 class CellGL extends HeadlessGL2 {

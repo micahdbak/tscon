@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test";
-
 import { HeadlessGL2 } from "./headless_gl.ts";
 import { compileProgram, getAttribLocations, getUniformLocations } from "./program.ts";
 

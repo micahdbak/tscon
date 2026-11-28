@@ -1,31 +1,27 @@
-export { Canvas } from "./canvas.ts";
-export type { CanvasOptions } from "./canvas.ts";
-export { TestCanvasHost, WebCanvasHost } from "./canvas_host.ts";
-export type { CanvasHost, CanvasHostEventMap } from "./canvas_host.ts";
-export type { Key, WheelMode } from "./input.ts";
-export { HeadlessGL2, createHeadlessGL2 } from "./headless_gl.ts";
-export { Terminal } from "./terminal.ts";
-export { packCell, unpackCell } from "./cell.ts";
-export type { Cell, CellAttributes } from "./cell.ts";
-export { Glyphs } from "./glyphs.ts";
-export { Spans } from "./span.ts";
-export type { Span } from "./span.ts";
-export type { Anchor } from "./glyphs.ts";
-export { hasEscape, scanEscapeAt } from "./escape.ts";
-export type { EscapeScan } from "./escape.ts";
-export { TAB_WIDTH, Wrap, textToLines } from "./wrap.ts";
-export type { TextOptions } from "./wrap.ts";
-export { TexGlyphMode, textureGlyphs } from "./tex_glyphs.ts";
-export type { TexGlyphs } from "./tex_glyphs.ts";
-export { Renderer } from "./renderer.ts";
-export { Mat4, Vec4 } from "./math.ts";
-export {
-	compileProgram,
-	getAttribLocations,
-	getUniformLocations,
-} from "./program.ts";
-export { renderCp437 } from "./cp437.ts";
+export { Canvas } from "./canvas/index.ts";
+export type { CanvasHost, CanvasHostEventMap } from "./canvas/index.ts";
+export type { CanvasOptions } from "./canvas/index.ts";
+export type { Key, WheelMode } from "./canvas/index.ts";
+export { TestCanvasHost, WebCanvasHost } from "./canvas/index.ts";
 export { Colour, DEFAULT_COLOURS, Palette } from "./colour.ts";
 export type { Rgb } from "./colour.ts";
+export { charCodeInCp437, CP437_CHARS, renderCp437 } from "./cp437.ts";
+export type { Anchor } from "./glyphs/index.ts";
+export type { Cell, CellAttributes } from "./glyphs/index.ts";
+export { Glyphs } from "./glyphs/index.ts";
+export { packCell, unpackCell } from "./glyphs/index.ts";
+export type { Span } from "./glyphs/index.ts";
+export { Spans } from "./glyphs/index.ts";
+export { createHeadlessGL2, HeadlessGL2 } from "./headless_gl.ts";
+export type { EscapeScan } from "./layout/index.ts";
+export { hasEscape, scanEscapeAt } from "./layout/index.ts";
+export { layoutText, TAB_WIDTH, textToLines, Wrap } from "./layout/index.ts";
+export type { TextLayout, TextOptions } from "./layout/index.ts";
+export { Mat4, Vec4 } from "./math.ts";
+export { compileProgram, getAttribLocations, getUniformLocations } from "./program.ts";
 export type { Rect } from "./rect.ts";
+export { Renderer } from "./renderer/index.ts";
+export { TexGlyphMode, textureGlyphs } from "./renderer/index.ts";
+export type { TexGlyphs } from "./renderer/index.ts";
+export { Terminal } from "./terminal/index.ts";
 export { loadCubeMap, loadTexture } from "./texture.ts";

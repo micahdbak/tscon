@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test";
-
-import { HeadlessGL2 } from "./headless_gl.ts";
+import { HeadlessGL2 } from "../headless_gl.ts";
 import { loadModernDosTexture } from "./moderndos.ts";
 
 class FontGL extends HeadlessGL2 {

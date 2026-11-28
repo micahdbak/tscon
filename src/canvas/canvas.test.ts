@@ -1,10 +1,9 @@
 import { describe, expect, test } from "bun:test";
-
+import { Colour, DEFAULT_COLOURS, Palette } from "../colour.ts";
+import { createHeadlessGL2 } from "../headless_gl.ts";
 import { Canvas } from "./canvas.ts";
 import { TestCanvasHost } from "./canvas_host.ts";
-import { Colour, DEFAULT_COLOURS, Palette } from "./colour.ts";
 import type { Key } from "./input.ts";
-import { createHeadlessGL2 } from "./headless_gl.ts";
 
 function harness(css_width = 800, css_height = 480) {
 	const host = new TestCanvasHost({ css_width, css_height });

@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test";
-
-import { Wrap, layoutText, textToLines } from "./wrap.ts";
+import { layoutText, textToLines, Wrap } from "./wrap.ts";
 
 const B = "\\";
 

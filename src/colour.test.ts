@@ -1,13 +1,12 @@
 import { describe, expect, test } from "bun:test";
-
-import { Canvas } from "./canvas.ts";
-import { TestCanvasHost } from "./canvas_host.ts";
-import { Glyphs } from "./glyphs.ts";
+import { Canvas } from "./canvas/canvas.ts";
+import { TestCanvasHost } from "./canvas/canvas_host.ts";
 import { DEFAULT_COLOURS, Palette } from "./colour.ts";
+import { Glyphs } from "./glyphs/glyphs.ts";
 import { HeadlessGL2 } from "./headless_gl.ts";
-import { Renderer } from "./renderer.ts";
-import { Terminal } from "./terminal.ts";
-import { TexGlyphMode, textureGlyphs } from "./tex_glyphs.ts";
+import { Renderer } from "./renderer/renderer.ts";
+import { TexGlyphMode, textureGlyphs } from "./renderer/tex_glyphs.ts";
+import { Terminal } from "./terminal/terminal.ts";
 
 class PaletteGL extends HeadlessGL2 {
 	readonly palette_updates: Float32Array[] = [];

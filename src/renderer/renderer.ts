@@ -1,12 +1,12 @@
-import { renderer_frag, renderer_vert } from "./shaders.ts";
-import { Canvas } from "./canvas.ts";
-import type { TexGlyphs } from "./tex_glyphs.ts";
+import { Canvas } from "../canvas/canvas.ts";
 import {
 	compileProgram,
 	getAttribLocations,
 	getUniformLocations,
-} from "./program.ts";
-import type { Rect } from "./rect.ts";
+} from "../program.ts";
+import type { Rect } from "../rect.ts";
+import { renderer_frag, renderer_vert } from "./shaders.ts";
+import type { TexGlyphs } from "./tex_glyphs.ts";
 
 /**
  * Draw a texture directly or as coloured characters on a {@link Canvas}.

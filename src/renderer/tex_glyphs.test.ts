@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test";
-
 import { TexGlyphMode, textureGlyphs } from "./tex_glyphs.ts";
 
 describe("textureGlyphs", () => {

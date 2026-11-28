@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test";
-
 import { pointerCell, scrollRowsForKey, wheelRows } from "./input.ts";
 
 describe("pointerCell", () => {

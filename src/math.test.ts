@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test";
-
 import { Mat4, Vec4 } from "./math.ts";
 
 function expectMatrix(actual: Float32Array, expected: number[]): void {

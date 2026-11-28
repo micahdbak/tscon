@@ -1,14 +1,13 @@
-import { terminal_frag, terminal_vert } from "./shaders.ts";
-import { Canvas } from "./canvas.ts";
-import { Glyphs } from "./glyphs.ts";
-import { Wrap } from "./wrap.ts";
-import type { Rect } from "./rect.ts";
-
+import { Canvas } from "../canvas/canvas.ts";
+import { Glyphs } from "../glyphs/glyphs.ts";
+import { Wrap } from "../layout/wrap.ts";
 import {
 	compileProgram,
 	getAttribLocations,
 	getUniformLocations,
-} from "./program.ts";
+} from "../program.ts";
+import type { Rect } from "../rect.ts";
+import { terminal_frag, terminal_vert } from "./shaders.ts";
 
 /**
  * Renders a character grid from glyphs onto a {@link Canvas}.
