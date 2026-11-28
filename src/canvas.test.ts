@@ -283,16 +283,19 @@ describe("Canvas", () => {
 		expect(keys).toEqual(["a"]);
 	});
 
-	test("select-all and copy shortcuts are consumed", () => {
+	test("page shortcuts are consumed while focused", () => {
 		const { host, keys } = harness();
 
 		host.keyDown("a", { ctrl: true });
-		expect(host.default_prevented).toBe(true);
+		expect(host.default_prevented).toBe(false);
 
 		host.keyDown("c", { meta: true });
-		expect(host.default_prevented).toBe(true);
+		expect(host.default_prevented).toBe(false);
 
-		host.keyDown("a", { ctrl: true, shift: true });
+		host.keyDown("f", { ctrl: true });
+		expect(host.default_prevented).toBe(false);
+
+		host.keyDown("g", { meta: true });
 		expect(host.default_prevented).toBe(false);
 
 		host.focus();
@@ -300,6 +303,18 @@ describe("Canvas", () => {
 
 		expect(keys).toEqual(["a"]);
 		expect(host.default_prevented).toBe(true);
+
+		host.keyDown("c", { meta: true });
+		expect(host.default_prevented).toBe(true);
+
+		host.keyDown("f", { ctrl: true });
+		expect(host.default_prevented).toBe(true);
+
+		host.keyDown("g", { meta: true });
+		expect(host.default_prevented).toBe(true);
+
+		host.keyDown("a", { ctrl: true, shift: true });
+		expect(host.default_prevented).toBe(false);
 	});
 
 	test("clear resets the cursor class", () => {

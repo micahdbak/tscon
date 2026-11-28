@@ -3,6 +3,8 @@ import { Colour, DEFAULT_COLOURS, Palette } from "./colour.ts";
 import { pointerCell, scrollRowsForKey, wheelRows, type Key, type WheelMode } from "./input.ts";
 import { loadModernDosTexture } from "./moderndos.ts";
 
+const PAGE_SHORTCUT_KEYS = new Set(["a", "c", "f", "g"]);
+
 /**
  * Options for constructing a {@link Canvas}.
  *
@@ -35,9 +37,9 @@ export type CanvasOptions = {
  * carry a {@link Key} in `detail`; they only fire while the host is
  * focused, so keys aimed at other elements are never delivered here. The
  * pointer focuses the canvas when it is pressed; call {@link focus} to
- * hand it the keyboard on boot. While attached, the canvas consumes
- * Ctrl/Cmd+A and Ctrl/Cmd+C so the page DOM beneath cannot be selected or
- * copied.
+ * hand it the keyboard on boot. While focused, the canvas consumes
+ * Ctrl/Cmd+A/C/F/G so page selection, copy, and find do not act on the DOM
+ * beneath it.
  *
  * Use {@link Canvas.from} in a browser or supply a {@link CanvasHost}
  * and a WebGL2 context.
@@ -452,20 +454,22 @@ export class Canvas extends EventTarget {
 	}
 
 	private pressKey(key: Key): void {
-		if (this.host.focused) {
+		const focused = this.host.focused;
+
+		if (focused) {
 			this.dispatchEvent(new CustomEvent<Key>("keydown", {
 				detail: key,
 			}));
 		}
 
-		// Ctrl/Cmd+A and Ctrl/Cmd+C act on the page DOM, not the canvas.
 		const name = key.key.toLowerCase();
-		const selection_shortcut = (name === "a" || name === "c")
+		const page_shortcut = focused
 			&& (key.ctrl || key.meta)
 			&& !key.alt
-			&& !key.shift;
+			&& !key.shift
+			&& PAGE_SHORTCUT_KEYS.has(name);
 
-		if (selection_shortcut) {
+		if (page_shortcut) {
 			key.prevent_default();
 		}
 
@@ -474,7 +478,7 @@ export class Canvas extends EventTarget {
 		}
 
 		const rows = scrollRowsForKey(key.key);
-		const active = this.host.focused || this.mouse_row !== undefined;
+		const active = focused || this.mouse_row !== undefined;
 
 		if (rows !== 0 && active) {
 			key.prevent_default();

@@ -248,6 +248,25 @@ describe("WebCanvasHost", () => {
 		expect(widths).toEqual([390]);
 	});
 
+	test("updates the backing store when DPR changes at a fixed CSS size", () => {
+		const window = fakeWindow();
+		(globalThis as Record<string, unknown>).window = window;
+
+		const element = fakeElement();
+		const host = new WebCanvasHost(element as unknown as HTMLCanvasElement);
+
+		window.devicePixelRatio = 1.25;
+		window.dispatchEvent(new Event("resize"));
+
+		expect(host.dpr).toBe(1.25);
+		expect(host.pixel_width).toBe(1000);
+		expect(host.pixel_height).toBe(600);
+		expect(element.width).toBe(1000);
+		expect(element.height).toBe(600);
+
+		host.dispose();
+	});
+
 	test("ignores the echo of its own backing-store write", () => {
 		const window = fakeWindow();
 		(globalThis as Record<string, unknown>).window = window;

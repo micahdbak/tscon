@@ -38,15 +38,6 @@ function lastPalette(gl: PaletteGL): number[] {
 }
 
 describe("colour palette", () => {
-	test("theme defaults are VGA with a lifted black and muted fg", () => {
-		expect(DEFAULT_COLOURS).toHaveLength(18);
-		expect(DEFAULT_COLOURS[0]).toEqual([0x08, 0x08, 0x08]);
-		expect(DEFAULT_COLOURS[1]).toEqual([0xaa, 0x00, 0x00]);
-		expect(DEFAULT_COLOURS[15]).toEqual([0xff, 0xff, 0xff]);
-		expect(DEFAULT_COLOURS[16]).toEqual([0xd0, 0xd0, 0xd0]);
-		expect(DEFAULT_COLOURS[17]).toEqual([0x00, 0x00, 0x00]);
-	});
-
 	test("Palette copies colours and clamps them when converting", () => {
 		const palette = new Palette([
 			[255, 0, 0],

@@ -336,7 +336,12 @@ export class WebCanvasHost extends CanvasHostBase {
 		const pixel_height = css_height * dpr;
 
 		// Ignore our own backing-store resize on attribute-sized canvases.
-		if (css_width > 0 && css_width === this.written_width && css_height === this.written_height) {
+		if (
+			css_width > 0 &&
+			css_width === this.written_width &&
+			css_height === this.written_height &&
+			dpr === this.dpr
+		) {
 			return;
 		}
 

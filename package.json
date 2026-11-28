@@ -33,7 +33,7 @@
 	],
 	"sideEffects": false,
 	"scripts": {
-		"lint": "oxlint src scripts",
+		"lint": "oxlint src scripts --import-plugin --promise-plugin --node-plugin -W perf",
 		"shaders": "bun run scripts/shaders.ts",
 		"build": "tsc -p tsconfig.json",
 		"prepack": "bun run build",
